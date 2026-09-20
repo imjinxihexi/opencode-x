@@ -1,9 +1,10 @@
 import { $ } from "bun"
+import { existsSync } from "node:fs"
 import { chmod, copyFile, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const CLI_VERSION = "0.0.0-next-16350"
+const CLI_VERSION = "0.0.0-next-16347"
 
 export type Channel = "dev" | "beta" | "prod"
 
@@ -71,8 +72,12 @@ export function getCurrentCli(target = RUST_TARGET ?? nativeTarget()) {
 
 export async function downloadCliToResources() {
   const cli = getCurrentCli()
-  const directory = await mkdtemp(join(tmpdir(), "opencode-cli-"))
   const dest = windowsify("resources/opencode-cli")
+  if (existsSync(dest)) {
+    console.log(`Using existing ${dest}`)
+    return
+  }
+  const directory = await mkdtemp(join(tmpdir(), "opencode-cli-"))
   try {
     await $`bun install --no-save --cwd ${directory} ${`${cli.package}@${CLI_VERSION}`} ${`--os=${cli.os}`} ${`--cpu=${cli.cpu}`}`
     await copyFile(

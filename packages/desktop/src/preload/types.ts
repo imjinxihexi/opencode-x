@@ -94,6 +94,36 @@ export type ElectronAPI = {
   openPath: (path: string, app?: string) => Promise<void>
   revealPath: (path: string) => Promise<boolean>
   readClipboardImage: () => Promise<{ buffer: ArrayBuffer; width: number; height: number } | null>
+  gitBranches: (cwd: string) => Promise<{ name: string; current: boolean }[]>
+  gitCheckout: (cwd: string, branch: string) => Promise<void>
+  gitCreateBranch: (cwd: string, name: string, startPoint?: string) => Promise<void>
+  gitFetch: (cwd: string) => Promise<string>
+  gitPull: (cwd: string) => Promise<string>
+  gitDeleteBranch: (cwd: string, name: string) => Promise<void>
+  gitCommit: (cwd: string, message: string) => Promise<string>
+  gitPush: (cwd: string) => Promise<string>
+  gitDiscard: (cwd: string) => Promise<void>
+  gitMerge: (cwd: string, branch: string) => Promise<string>
+  gitCurrentBranch: (cwd: string) => Promise<string>
+  gitHasChanges: (cwd: string) => Promise<boolean>
+  gitConflicts: (cwd: string) => Promise<string[]>
+  gitResolveConflict: (cwd: string, file: string, side: "ours" | "theirs") => Promise<void>
+  gitMergeAbort: (cwd: string) => Promise<void>
+  gitLog: (
+    cwd: string,
+    limit?: number,
+  ) => Promise<{ hash: string; author: string; when: string; subject: string }[]>
+  gitFileDiff: (cwd: string, file: string) => Promise<string>
+  gitStatusRaw: (cwd: string) => Promise<{ file: string; index: string; worktree: string; untracked: boolean }[]>
+  gitStageFile: (cwd: string, file: string) => Promise<void>
+  gitStageAll: (cwd: string) => Promise<void>
+  gitUnstageAll: (cwd: string) => Promise<void>
+  gitUnstageFile: (cwd: string, file: string) => Promise<void>
+  gitStagedFileDiff: (cwd: string, file: string) => Promise<string>
+  gitApplyCached: (cwd: string, text: string, reverse: boolean) => Promise<void>
+  gitUndoCommit: (cwd: string) => Promise<void>
+  gitClone: (url: string, workspace: string, name: string, branch?: string) => Promise<string>
+  gitRemoteBranches: (cwd: string) => Promise<string[]>
   getWindowFocused: () => Promise<boolean>
   getWindowFullscreen: () => Promise<boolean>
   onWindowFullscreenChanged: (cb: (fullscreen: boolean) => void) => () => void

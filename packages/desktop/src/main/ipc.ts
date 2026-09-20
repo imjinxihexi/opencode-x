@@ -24,6 +24,35 @@ import type { UpdaterController } from "./updater-controller"
 import { createUpdaterSubscriptions } from "./updater-subscriptions"
 import { createDesktopDraftStore } from "./draft-store"
 import { nativeT } from "./native-translations"
+import {
+  applyCached as gitApplyCached,
+  branches as gitBranches,
+  checkout as gitCheckout,
+  clone as gitClone,
+  commit as gitCommit,
+  conflicts as gitConflicts,
+  createBranch as gitCreateBranch,
+  currentBranch as gitCurrentBranch,
+  deleteBranch as gitDeleteBranch,
+  discard as gitDiscard,
+  fetchRemote as gitFetch,
+  fileDiff as gitFileDiff,
+  hasTrackedChanges as gitHasTrackedChanges,
+  log as gitLog,
+  merge as gitMerge,
+  mergeAbort as gitMergeAbort,
+  pull as gitPull,
+  push as gitPush,
+  remoteBranches as gitRemoteBranches,
+  resolveConflict as gitResolveConflict,
+  stageFile as gitStageFile,
+  stageAll as gitStageAll,
+  stagedFileDiff as gitStagedFileDiff,
+  statusRaw as gitStatusRaw,
+  undoCommit as gitUndoCommit,
+  unstageAll as gitUnstageAll,
+  unstageFile as gitUnstageFile,
+} from "./git"
 
 const pickerFilters = (ext?: string[]) => {
   if (!ext || ext.length === 0) return undefined
@@ -63,6 +92,47 @@ export function registerIpcHandlers(deps: Deps) {
   app.on("browser-window-created", (_event, win) => win.on("session-end", () => drafts.flush()))
 
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
+  ipcMain.handle("git-branches", (_event: IpcMainInvokeEvent, cwd: string) => gitBranches(cwd))
+  ipcMain.handle("git-checkout", (_event: IpcMainInvokeEvent, cwd: string, branch: string) => gitCheckout(cwd, branch))
+  ipcMain.handle("git-create-branch", (_event: IpcMainInvokeEvent, cwd: string, name: string, startPoint?: string) =>
+    gitCreateBranch(cwd, name, startPoint),
+  )
+  ipcMain.handle("git-fetch", (_event: IpcMainInvokeEvent, cwd: string) => gitFetch(cwd))
+  ipcMain.handle("git-pull", (_event: IpcMainInvokeEvent, cwd: string) => gitPull(cwd))
+  ipcMain.handle("git-delete-branch", (_event: IpcMainInvokeEvent, cwd: string, name: string) =>
+    gitDeleteBranch(cwd, name),
+  )
+  ipcMain.handle("git-commit", (_event: IpcMainInvokeEvent, cwd: string, message: string) => gitCommit(cwd, message))
+  ipcMain.handle("git-push", (_event: IpcMainInvokeEvent, cwd: string) => gitPush(cwd))
+  ipcMain.handle("git-discard", (_event: IpcMainInvokeEvent, cwd: string) => gitDiscard(cwd))
+  ipcMain.handle("git-merge", (_event: IpcMainInvokeEvent, cwd: string, branch: string) => gitMerge(cwd, branch))
+  ipcMain.handle("git-current-branch", (_event: IpcMainInvokeEvent, cwd: string) => gitCurrentBranch(cwd))
+  ipcMain.handle("git-has-changes", (_event: IpcMainInvokeEvent, cwd: string) => gitHasTrackedChanges(cwd))
+  ipcMain.handle("git-conflicts", (_event: IpcMainInvokeEvent, cwd: string) => gitConflicts(cwd))
+  ipcMain.handle("git-resolve-conflict", (_event: IpcMainInvokeEvent, cwd: string, file: string, side: string) =>
+    gitResolveConflict(cwd, file, side === "ours" ? "ours" : "theirs"),
+  )
+  ipcMain.handle("git-merge-abort", (_event: IpcMainInvokeEvent, cwd: string) => gitMergeAbort(cwd))
+  ipcMain.handle("git-log", (_event: IpcMainInvokeEvent, cwd: string, limit?: number) => gitLog(cwd, limit))
+  ipcMain.handle("git-file-diff", (_event: IpcMainInvokeEvent, cwd: string, file: string) => gitFileDiff(cwd, file))
+  ipcMain.handle("git-status-raw", (_event: IpcMainInvokeEvent, cwd: string) => gitStatusRaw(cwd))
+  ipcMain.handle("git-stage-file", (_event: IpcMainInvokeEvent, cwd: string, file: string) => gitStageFile(cwd, file))
+  ipcMain.handle("git-stage-all", (_event: IpcMainInvokeEvent, cwd: string) => gitStageAll(cwd))
+  ipcMain.handle("git-unstage-all", (_event: IpcMainInvokeEvent, cwd: string) => gitUnstageAll(cwd))
+  ipcMain.handle("git-unstage-file", (_event: IpcMainInvokeEvent, cwd: string, file: string) =>
+    gitUnstageFile(cwd, file),
+  )
+  ipcMain.handle("git-staged-file-diff", (_event: IpcMainInvokeEvent, cwd: string, file: string) =>
+    gitStagedFileDiff(cwd, file),
+  )
+  ipcMain.handle("git-apply-cached", (_event: IpcMainInvokeEvent, cwd: string, text: string, reverse: boolean) =>
+    gitApplyCached(cwd, text, reverse),
+  )
+  ipcMain.handle("git-undo-commit", (_event: IpcMainInvokeEvent, cwd: string) => gitUndoCommit(cwd))
+  ipcMain.handle("git-clone", (_event: IpcMainInvokeEvent, url: string, workspace: string, name: string, branch?: string) =>
+    gitClone(url, workspace, name, branch),
+  )
+  ipcMain.handle("git-remote-branches", (_event: IpcMainInvokeEvent, cwd: string) => gitRemoteBranches(cwd))
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
   ipcMain.handle("consume-initial-deep-links", () => deps.consumeInitialDeepLinks())
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())
