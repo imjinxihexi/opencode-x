@@ -76,10 +76,22 @@ export default function NewLayout(props: ParentProps) {
 
   const repos = createMemo<Repo[]>(() => {
     const workspace = activeWorkspace()
-    if (!workspace) return scanned() ?? []
-    const branches = workspaceBranches() ?? {}
-    return workspace.repos.map((repo) => ({ directory: repo.directory, branch: branches[repo.directory] || repo.branch }))
+    if (workspace) {
+      const branches = workspaceBranches() ?? {}
+      return workspace.repos.map((repo) => ({
+        directory: repo.directory,
+        branch: branches[repo.directory] || repo.branch,
+      }))
+    }
+    if (scanned.loading) return []
+    return scanned() ?? []
   })
+
+  const [conflicts] = createResource(
+    () => [state.repo, gitRefresh()] as const,
+    async ([directory]) => (directory ? gitActions.conflicts(directory).catch(() => [] as string[]) : []),
+    { initialValue: [] as string[] },
+  )
 
   const reposLoading = () => (activeWorkspace() ? false : scanned.loading)
 
@@ -99,6 +111,11 @@ export default function NewLayout(props: ParentProps) {
   const openProject = (directory: string) => {
     layout.projects.open(directory)
     navigate("/")
+  }
+
+  const refreshAll = () => {
+    setRefresh((value) => value + 1)
+    setGitRefresh((value) => value + 1)
   }
 
   const createWorkspace = () => {
@@ -165,7 +182,7 @@ export default function NewLayout(props: ParentProps) {
           workspaces={workspaces.list()}
           selectedWorkspace={state.workspace}
           onResize={(width) => setPanels("left", width)}
-          onRefresh={() => setRefresh((value) => value + 1)}
+          onRefresh={refreshAll}
           onSelectProject={(directory) => {
             setState("workspace", undefined)
             setState("selected", directory)
@@ -196,6 +213,7 @@ export default function NewLayout(props: ParentProps) {
           activeFile={diffTarget()?.file}
           onOpenDiff={(target) => setDiffTarget(target)}
           hideResize={Boolean(diffTarget())}
+          conflicts={conflicts() ?? []}
         />
         <Show when={diffTarget()}>
           {(target) => (
@@ -208,6 +226,11 @@ export default function NewLayout(props: ParentProps) {
               onResize={(width) => setPanels("diff", width)}
               onClose={() => setDiffTarget(undefined)}
               onChanged={() => setGitRefresh((value) => value + 1)}
+              conflicts={conflicts() ?? []}
+              onResolved={() => {
+                refreshAll()
+                setDiffTarget(undefined)
+              }}
             />
           )}
         </Show>

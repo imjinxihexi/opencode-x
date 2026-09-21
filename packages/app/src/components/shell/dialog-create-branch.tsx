@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createResource, createSignal } from "solid-js"
+import { createEffect, createMemo, createResource, createSignal, Show } from "solid-js"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { Field } from "@opencode-ai/ui/v2/field-v2"
@@ -6,6 +6,7 @@ import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
+import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
 import { showToast } from "@/utils/toast"
 
@@ -87,7 +88,7 @@ export function DialogCreateBranch(props: { directory: string; onCreated: () => 
         <Field>
           <Field.Label>{language.t("shell.git.newBranch.source")}</Field.Label>
           <SelectV2
-            class="!w-full"
+            class="!w-full [&_[data-component=select-v2]]:!w-full"
             options={names()}
             current={selectedSource()}
             value={(value) => value}
@@ -114,7 +115,15 @@ export function DialogCreateBranch(props: { directory: string; onCreated: () => 
         <ButtonV2 type="button" variant="neutral" disabled={busy()} onClick={dialog.close}>
           {language.t("common.cancel")}
         </ButtonV2>
-        <ButtonV2 type="button" variant="contrast" disabled={busy() || !name().trim()} onClick={() => void create()}>
+        <ButtonV2
+          type="button"
+          variant="contrast"
+          disabled={busy() || !name().trim()}
+          onClick={() => void create()}
+        >
+          <Show when={busy()}>
+            <Spinner class="!text-[#ffffff]" />
+          </Show>
           {language.t("shell.git.newBranch.create")}
         </ButtonV2>
       </DialogFooter>

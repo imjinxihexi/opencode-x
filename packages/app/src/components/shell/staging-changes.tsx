@@ -132,6 +132,8 @@ export function StagingChanges(props: {
   refresh?: number
   revision: number
   onCount?: (count: number) => void
+  onTotal?: (count: number) => void
+  conflicts: string[]
   activeFile?: string
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
 }) {
@@ -153,6 +155,7 @@ export function StagingChanges(props: {
   const unstaged = createMemo(() => toItems(status() ?? [], "worktree"))
 
   createEffect(() => props.onCount?.(staged().length))
+  createEffect(() => props.onTotal?.(staged().length + unstaged().length))
 
   const act = async (key: string, run: () => Promise<unknown>) => {
     setPending(key)
@@ -220,6 +223,7 @@ export function StagingChanges(props: {
             onAction={(item) => toggleFile(item, true)}
             isCollapsed={isCollapsed}
             toggleDir={toggleDir}
+            conflicts={props.conflicts}
           />
         </div>
       </Show>
@@ -254,6 +258,7 @@ export function StagingChanges(props: {
             onAction={(item) => toggleFile(item, false)}
             isCollapsed={isCollapsed}
             toggleDir={toggleDir}
+            conflicts={props.conflicts}
           />
         </div>
       </Show>
@@ -277,6 +282,7 @@ function FileTree(props: {
   onAction: (item: StageItem) => void
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
+  conflicts: string[]
 }) {
   const tree = createMemo(() => buildTree(props.items))
   return <FileDir {...props} node={tree()} depth={0} />
@@ -294,6 +300,7 @@ function FileDir(props: {
   onAction: (item: StageItem) => void
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
+  conflicts: string[]
 }) {
   const dirs = createMemo(() => [...props.node.dirs.values()].toSorted((a, b) => a.name.localeCompare(b.name)))
   const active = (file: string) => props.selected?.file === file && props.selected?.staged === props.staged
@@ -312,6 +319,7 @@ function FileDir(props: {
             onAction={props.onAction}
             isCollapsed={props.isCollapsed}
             toggleDir={props.toggleDir}
+            conflicts={props.conflicts}
           />
         )}
       </For>
@@ -324,7 +332,12 @@ function FileDir(props: {
             title={item.file}
             onClick={() => props.onSelect(item)}
           >
-            <span class={`size-1.5 shrink-0 rounded-full ${toneColor(item.tone)}`} />
+            <Show
+              when={props.conflicts.includes(item.file)}
+              fallback={<span class={`size-1.5 shrink-0 rounded-full ${toneColor(item.tone)}`} />}
+            >
+              <Icon name="warning" size="small" class="shrink-0 text-[#d29922]" />
+            </Show>
             <span class="min-w-0 flex-1 truncate text-[12px] leading-5 text-v2-text-text-base">
               {item.file.split("/").pop()}
             </span>
@@ -358,6 +371,7 @@ function DirNode(props: {
   onAction: (item: StageItem) => void
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
+  conflicts: string[]
 }) {
   const open = () => !props.isCollapsed(props.dir.path)
   return (
@@ -388,6 +402,7 @@ function DirNode(props: {
           onAction={props.onAction}
           isCollapsed={props.isCollapsed}
           toggleDir={props.toggleDir}
+          conflicts={props.conflicts}
         />
       </Show>
     </>

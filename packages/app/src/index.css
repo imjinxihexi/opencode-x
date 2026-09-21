@@ -327,4 +327,10 @@
       animation-range: 0 0.1px;
     }
   }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: color-mix(in srgb, var(--v2-text-text-base) 32%, transparent) !important;
+    opacity: 1;
+  }
 }

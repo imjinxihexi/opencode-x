@@ -3,6 +3,7 @@ import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogCreateBranch } from "@/components/shell/dialog-create-branch"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { DialogSwitchBranch } from "@/components/shell/dialog-switch-branch"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
 import { useLanguage } from "@/context/language"
@@ -25,16 +26,19 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
     }
   }
 
-  const act = async (run: () => Promise<unknown>) => {
+  const act = async (title: string, successLabel: string, run: () => Promise<unknown>) => {
     try {
       await run()
       props.onRefresh()
+      dialog.show(() => <DialogGitResult title={title} status="done" successLabel={successLabel} />)
     } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
+      dialog.show(() => (
+        <DialogGitResult
+          title={title}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
     }
   }
 
@@ -72,7 +76,13 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
             <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.newBranch")}</span>
           </MenuV2.Item>
 
-          <MenuV2.Item onSelect={() => void act(() => gitActions.pull(props.directory))}>
+          <MenuV2.Item
+            onSelect={() =>
+              void act(language.t("shell.git.menu.pull"), language.t("shell.git.pullSuccess"), () =>
+                gitActions.pull(props.directory),
+              )
+            }
+          >
             <Icon name="outline-share" size="small" />
             <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.pull")}</span>
           </MenuV2.Item>
@@ -94,7 +104,13 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
                 <For each={branches().filter((branch) => !branch.current)}>
                   {(branch) => (
                     <MenuV2.Item
-                      onSelect={() => void act(() => gitActions.deleteBranch(props.directory, branch.name))}
+                      onSelect={() =>
+                        void act(
+                          language.t("shell.git.menu.delete"),
+                          language.t("shell.git.deleteBranchSuccess"),
+                          () => gitActions.deleteBranch(props.directory, branch.name),
+                        )
+                      }
                     >
                       <Icon name="branch" size="small" />
                       <span class="min-w-0 flex-1 truncate">{branch.name}</span>

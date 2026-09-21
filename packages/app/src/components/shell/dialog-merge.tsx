@@ -1,10 +1,12 @@
-import { createEffect, createMemo, createResource, createSignal } from "solid-js"
+import { createMemo, createResource, createSignal, Show } from "solid-js"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { Field } from "@opencode-ai/ui/v2/field-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogGitRun } from "@/components/shell/dialog-git-run"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
+import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
 import { showToast } from "@/utils/toast"
 
@@ -23,33 +25,33 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
   const current = createMemo(() => branches().find((branch) => branch.current)?.name)
   const options = createMemo(() => branches().map((branch) => branch.name).filter((name) => name !== current()))
 
-  const confirm = async () => {
+  const [preview] = createResource(
+    () => {
+      const from = source()
+      const to = current()
+      return from && to && from !== to ? ([props.directory, from, to] as const) : undefined
+    },
+    async ([directory, from, to]) =>
+      gitActions.mergePreview(directory, from, to).catch(() => ({ commits: 0, conflicts: false })),
+  )
+
+  const confirm = () => {
     const from = source()
     const target = current()
     if (!from || !target || from === target) return
-    setBusy(true)
-    try {
-      if (await gitActions.hasChanges(props.directory)) {
-        showToast({ variant: "error", title: language.t("shell.git.actionFailed"), description: language.t("shell.git.merge.dirty") })
-        return
-      }
-      const verified = await gitActions.currentBranch(props.directory)
-      if (verified !== target) {
-        showToast({ variant: "error", title: language.t("shell.git.actionFailed"), description: language.t("shell.git.merge.checkoutFailed") })
-        return
-      }
-      await gitActions.merge(props.directory, from)
-      props.onMerged()
-      dialog.close()
-    } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
-    } finally {
-      setBusy(false)
-    }
+    dialog.show(() => (
+      <DialogGitRun
+        title={language.t("shell.git.merge.title")}
+        successLabel={language.t("shell.git.merge.success")}
+        run={async () => {
+          if (await gitActions.hasChanges(props.directory)) throw new Error(language.t("shell.git.merge.dirty"))
+          const verified = await gitActions.currentBranch(props.directory)
+          if (verified !== target) throw new Error(language.t("shell.git.merge.checkoutFailed"))
+          await gitActions.merge(props.directory, from)
+          props.onMerged()
+        }}
+      />
+    ))
   }
 
   return (
@@ -64,7 +66,7 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
         <Field>
           <Field.Label>{language.t("shell.git.merge.source")}</Field.Label>
           <SelectV2
-            class="!w-full"
+            class="!w-full [&_[data-component=select-v2]]:!w-full"
             options={options()}
             current={source()}
             placeholder={language.t("shell.git.merge.pickSource")}
@@ -84,6 +86,34 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
             </span>
           </div>
         </Field>
+        <Show when={source() && current() && source() !== current()}>
+          <div
+            class="flex items-center gap-2 rounded-md border-[0.5px] px-3 py-2 text-[12px] leading-5"
+            classList={{
+              "border-[#3fb950] bg-[#3fb9501a] text-[#2f9e44]": preview()?.conflicts === false && !preview.loading,
+              "border-[#d29922] bg-[#d299221a] text-[#b8860b]": preview()?.conflicts === true,
+              "border-v2-border-border-base bg-v2-background-bg-layer-02 text-v2-text-text-base": preview.loading,
+            }}
+          >
+            <Show
+              when={!preview.loading && preview()}
+              fallback={
+                <>
+                  <Spinner />
+                  <span class="text-v2-text-text-muted">{language.t("common.loading")}</span>
+                </>
+              }
+            >
+              {(value) => (
+                <span>
+                  {value().conflicts
+                    ? language.t("shell.git.merge.conflictHint", { count: value().commits })
+                    : language.t("shell.git.merge.cleanHint", { count: value().commits })}
+                </span>
+              )}
+            </Show>
+          </div>
+        </Show>
       </DialogBody>
       <DialogFooter>
         <ButtonV2 type="button" variant="neutral" disabled={busy()} onClick={dialog.close}>
@@ -92,8 +122,8 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
         <ButtonV2
           type="button"
           variant="contrast"
-          disabled={busy() || !source() || source() === current()}
-          onClick={() => void confirm()}
+          disabled={!source() || source() === current()}
+          onClick={() => confirm()}
         >
           {language.t("shell.git.merge.confirm")}
         </ButtonV2>

@@ -2,6 +2,7 @@ import { For, Show, createMemo, createResource, createSignal } from "solid-js"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { gitActions } from "@/components/shell/git-actions"
+import { ConflictMerge } from "@/components/shell/conflict-merge"
 import { rowClass, splitHunks, toSplit, toUnified, type UnifiedRow } from "@/components/shell/staging-changes"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
@@ -18,6 +19,8 @@ export function DiffPanel(props: {
   onResize: (width: number) => void
   onClose: () => void
   onChanged: () => void
+  conflicts: string[]
+  onResolved: () => void
 }) {
   const language = useLanguage()
   const [split, setSplit] = createSignal(false)
@@ -90,6 +93,11 @@ export function DiffPanel(props: {
         </button>
       </div>
 
+      <Show when={props.conflicts.includes(props.target.file)}>
+        <ConflictMerge directory={props.target.directory} file={props.target.file} onResolved={props.onResolved} />
+      </Show>
+
+      <Show when={!props.conflicts.includes(props.target.file)}>
       <Show
         when={!diff.loading}
         fallback={
@@ -144,6 +152,7 @@ export function DiffPanel(props: {
             </div>
           </div>
         </Show>
+      </Show>
       </Show>
 
       <ResizeHandle

@@ -30,6 +30,7 @@ import {
   checkout as gitCheckout,
   clone as gitClone,
   commit as gitCommit,
+  conflictSides as gitConflictSides,
   conflicts as gitConflicts,
   createBranch as gitCreateBranch,
   currentBranch as gitCurrentBranch,
@@ -41,6 +42,7 @@ import {
   log as gitLog,
   merge as gitMerge,
   mergeAbort as gitMergeAbort,
+  mergePreview as gitMergePreview,
   pull as gitPull,
   push as gitPush,
   remoteBranches as gitRemoteBranches,
@@ -53,6 +55,7 @@ import {
   undoCommit as gitUndoCommit,
   unstageAll as gitUnstageAll,
   unstageFile as gitUnstageFile,
+  writeResolved as gitWriteResolved,
 } from "./git"
 
 const pickerFilters = (ext?: string[]) => {
@@ -107,6 +110,9 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("git-push", (_event: IpcMainInvokeEvent, cwd: string) => gitPush(cwd))
   ipcMain.handle("git-discard", (_event: IpcMainInvokeEvent, cwd: string) => gitDiscard(cwd))
   ipcMain.handle("git-merge", (_event: IpcMainInvokeEvent, cwd: string, branch: string) => gitMerge(cwd, branch))
+  ipcMain.handle("git-merge-preview", (_event: IpcMainInvokeEvent, cwd: string, source: string, target: string) =>
+    gitMergePreview(cwd, source, target),
+  )
   ipcMain.handle("git-current-branch", (_event: IpcMainInvokeEvent, cwd: string) => gitCurrentBranch(cwd))
   ipcMain.handle("git-has-changes", (_event: IpcMainInvokeEvent, cwd: string) => gitHasTrackedChanges(cwd))
   ipcMain.handle("git-conflicts", (_event: IpcMainInvokeEvent, cwd: string) => gitConflicts(cwd))
@@ -114,6 +120,12 @@ export function registerIpcHandlers(deps: Deps) {
     gitResolveConflict(cwd, file, side === "ours" ? "ours" : "theirs"),
   )
   ipcMain.handle("git-merge-abort", (_event: IpcMainInvokeEvent, cwd: string) => gitMergeAbort(cwd))
+  ipcMain.handle("git-conflict-sides", (_event: IpcMainInvokeEvent, cwd: string, file: string) =>
+    gitConflictSides(cwd, file),
+  )
+  ipcMain.handle("git-write-resolved", (_event: IpcMainInvokeEvent, cwd: string, file: string, content: string) =>
+    gitWriteResolved(cwd, file, content),
+  )
   ipcMain.handle("git-log", (_event: IpcMainInvokeEvent, cwd: string, limit?: number) => gitLog(cwd, limit))
   ipcMain.handle("git-file-diff", (_event: IpcMainInvokeEvent, cwd: string, file: string) => gitFileDiff(cwd, file))
   ipcMain.handle("git-status-raw", (_event: IpcMainInvokeEvent, cwd: string) => gitStatusRaw(cwd))

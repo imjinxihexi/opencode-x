@@ -5,7 +5,10 @@ import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { DialogConfirm } from "@/components/shell/dialog-confirm"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
+import { DialogGitRun } from "@/components/shell/dialog-git-run"
 import { DialogMerge } from "@/components/shell/dialog-merge"
+import { GitButton } from "@/components/shell/git-button"
 import { gitActions, type GitCommit } from "@/components/shell/git-actions"
 import type { Repo } from "@/components/shell/repos"
 import { Spinner } from "@/components/shell/spinner"
@@ -31,6 +34,7 @@ export function GitPanel(props: {
   activeFile?: string
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
   hideResize?: boolean
+  conflicts: string[]
 }) {
   const language = useLanguage()
   const sdk = useServerSDK()
@@ -73,15 +77,6 @@ export function GitPanel(props: {
       })
     },
   )
-
-  const [conflicts] = createResource(
-    () => [props.selectedRepo, props.refresh, revision()] as const,
-    async ([directory]) => {
-      if (!directory) return [] as string[]
-      return gitActions.conflicts(directory).catch(() => [] as string[])
-    },
-  )
-
   return (
     <aside
       class="relative h-full shrink-0 flex flex-col border-l-[0.5px] border-v2-border-border-base bg-v2-background-bg-deep"
@@ -175,7 +170,7 @@ export function GitPanel(props: {
                   revision={revision()}
                   message={message()}
                   setMessage={setMessage}
-                  conflicts={conflicts() ?? []}
+                  conflicts={props.conflicts}
                   onRefresh={props.onRefresh}
                   activeFile={props.activeFile}
                   onOpenDiff={props.onOpenDiff}
@@ -240,6 +235,8 @@ function CommitSection(props: {
   const dialog = useDialog()
   const [busy, setBusy] = createSignal(false)
   const [stagedCount, setStagedCount] = createSignal(0)
+  const [totalCount, setTotalCount] = createSignal(0)
+  const [pending, setPending] = createSignal<string>()
   const [commits, setCommits] = createSignal<GitCommit[]>([])
 
   const loadCommits = () => {
@@ -278,64 +275,67 @@ function CommitSection(props: {
     }
   }
 
+  const runAction = (key: string, title: string, successLabel: string, action: () => Promise<unknown>) => {
+    setPending(key)
+    Promise.resolve()
+      .then(action)
+      .then(() => {
+        props.onRefresh()
+        dialog.show(() => <DialogGitResult title={title} status="done" successLabel={successLabel} />)
+      })
+      .catch((error) => {
+        dialog.show(() => (
+          <DialogGitResult
+            title={title}
+            status="error"
+            message={error instanceof Error ? error.message : String(error)}
+          />
+        ))
+      })
+      .finally(() => setPending(undefined))
+  }
+
   const commitAndPush = () => {
     const directory = props.directory
     const message = props.message.trim()
     if (!directory || !message) return
-    void run(async () => {
-      await gitActions.commit(directory, message)
-      await gitActions.push(directory)
-      props.setMessage("")
-    })
+    setPending("commit")
+    dialog.show(() => (
+      <DialogGitRun
+        title={language.t("shell.git.commitAndPush")}
+        successLabel={language.t("shell.git.commitSuccess")}
+        onSettled={() => setPending(undefined)}
+        run={async () => {
+          if (stagedCount() === 0) await gitActions.stageAll(directory, [])
+          await gitActions.commit(directory, message)
+          await gitActions.push(directory)
+          props.setMessage("")
+          props.onRefresh()
+        }}
+      />
+    ))
   }
 
-  const canCommit = () =>
-    Boolean(props.directory && props.message.trim() && stagedCount() > 0 && !busy())
+  const hasContent = () => Boolean(props.directory && props.message.trim() && totalCount() > 0)
+  const canCommit = () => hasContent() && !busy()
 
   return (
     <section class="flex flex-col gap-3">
       <Show when={props.conflicts.length > 0 && props.directory}>
-        <section class="flex flex-col gap-1 rounded-md border-[0.5px] border-[#f85149] bg-[#f851491a] p-2">
-          <div class="flex items-center gap-2">
-            <Icon name="status" size="small" class="shrink-0 text-[#f85149]" />
-            <span class="min-w-0 flex-1 text-[12px] font-[530] text-[#f85149]">
-              {language.t("shell.git.conflict.title")}
-            </span>
-            <button
-              type="button"
-              class="shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-              disabled={busy()}
-              onClick={() => void run(() => gitActions.mergeAbort(props.directory!))}
-            >
-              {language.t("shell.git.conflict.abort")}
-            </button>
-          </div>
-          <For each={props.conflicts}>
-            {(file) => (
-              <div class="flex min-w-0 items-center gap-1">
-                <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-v2-text-text-base" title={file}>
-                  {file}
-                </span>
-                <button
-                  type="button"
-                  class="shrink-0 rounded-sm border-[0.5px] border-v2-border-border-muted px-1.5 py-0.5 text-[11px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-                  disabled={busy()}
-                  onClick={() => void run(() => gitActions.resolveConflict(props.directory!, file, "ours"))}
-                >
-                  {language.t("shell.git.conflict.ours")}
-                </button>
-                <button
-                  type="button"
-                  class="shrink-0 rounded-sm border-[0.5px] border-v2-border-border-muted px-1.5 py-0.5 text-[11px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-                  disabled={busy()}
-                  onClick={() => void run(() => gitActions.resolveConflict(props.directory!, file, "theirs"))}
-                >
-                  {language.t("shell.git.conflict.theirs")}
-                </button>
-              </div>
-            )}
-          </For>
-        </section>
+        <div class="flex items-center gap-2 rounded-md border-[0.5px] border-[#f85149] bg-[#f851491a] px-2 py-1.5">
+          <Icon name="warning" size="small" class="shrink-0 text-[#f85149]" />
+          <span class="min-w-0 flex-1 truncate text-[12px] font-[530] text-[#f85149]">
+            {language.t("shell.git.conflict.title")} · {props.conflicts.length}
+          </span>
+          <button
+            type="button"
+            class="shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+            disabled={busy()}
+            onClick={() => void run(() => gitActions.mergeAbort(props.directory!))}
+          >
+            {language.t("shell.git.conflict.abort")}
+          </button>
+        </div>
       </Show>
 
       <div class="px-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
@@ -346,6 +346,8 @@ function CommitSection(props: {
         refresh={props.refresh}
         revision={props.revision}
         onCount={setStagedCount}
+        onTotal={setTotalCount}
+        conflicts={props.conflicts}
         activeFile={props.activeFile}
         onOpenDiff={props.onOpenDiff}
       />
@@ -354,13 +356,14 @@ function CommitSection(props: {
         {language.t("shell.git.commit")}
       </div>
       <textarea
-        class="h-24 w-full resize-none rounded-md border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base px-2 py-1.5 text-[13px] leading-5 text-v2-text-text-base placeholder:text-v2-text-text-muted focus-visible:border-v2-border-border-focus focus-visible:outline-none"
+        class="h-24 w-full resize-none rounded-md border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base px-2 py-1.5 text-[13px] leading-5 text-v2-text-text-base placeholder:text-v2-text-text-faint focus-visible:border-v2-border-border-focus focus-visible:outline-none disabled:opacity-60"
         placeholder={language.t("shell.git.messagePlaceholder")}
         value={props.message}
+        disabled={busy()}
         onInput={(event) => props.setMessage(event.currentTarget.value)}
       />
       <Show
-        when={canCommit()}
+        when={hasContent()}
         fallback={
           <button
             type="button"
@@ -374,39 +377,30 @@ function CommitSection(props: {
       >
         <button
           type="button"
-          class="flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-[#6366F1] text-[13px] font-[440] text-[#ffffff] transition-opacity hover:opacity-90 focus-visible:outline-none"
-          disabled={busy()}
+          class="flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-[#6366F1] text-[13px] font-[440] text-[#ffffff] transition-opacity hover:opacity-90 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={busy() || pending() === "commit"}
           onClick={commitAndPush}
         >
-          <Show when={busy()} fallback={<Icon name="outline-share" size="small" />}>
-            <Spinner class="text-[#ffffff]" />
+          <Show when={busy() || pending() === "commit"} fallback={<Icon name="outline-share" size="small" />}>
+            <Spinner class="!text-[#ffffff]" />
           </Show>
           {language.t("shell.git.commitAndPush")}
         </button>
       </Show>
       <div class="grid grid-cols-2 gap-1">
-        <ActionButton
-          icon="reset"
-          label={language.t("shell.git.discard")}
-          disabled={busy() || !props.directory}
-          onClick={() =>
-            dialog.show(() => (
-              <DialogConfirm
-                title={language.t("shell.git.discardConfirm.title")}
-                description={language.t("shell.git.discardConfirm.description")}
-                confirmLabel={language.t("shell.git.discard")}
-                onConfirm={() => run(() => gitActions.discard(props.directory!))}
-              />
-            ))
-          }
-        />
-        <ActionButton
+        <GitButton
           icon="outline-share"
           label={language.t("shell.git.push")}
+          loading={pending() === "push"}
           disabled={busy() || !props.directory}
-          onClick={() => void run(() => gitActions.push(props.directory!))}
+          onClick={() =>
+            props.directory &&
+            runAction("push", language.t("shell.git.push"), language.t("shell.git.pushSuccess"), () =>
+              gitActions.push(props.directory!),
+            )
+          }
         />
-        <ActionButton
+        <GitButton
           icon="branch"
           label={language.t("shell.git.merge")}
           disabled={busy() || !props.directory}
@@ -414,9 +408,51 @@ function CommitSection(props: {
             dialog.show(() => <DialogMerge directory={props.directory!} onMerged={props.onRefresh} />)
           }
         />
-        <ActionButton
+        <Show
+          when={props.conflicts.length > 0}
+          fallback={
+            <GitButton
+              icon="reset"
+              label={language.t("shell.git.discard")}
+              loading={pending() === "discard"}
+              disabled={busy() || !props.directory}
+              onClick={() =>
+                dialog.show(() => (
+                  <DialogConfirm
+                    title={language.t("shell.git.discardConfirm.title")}
+                    description={language.t("shell.git.discardConfirm.description")}
+                    confirmLabel={language.t("shell.git.discard")}
+                    onConfirm={() =>
+                      runAction("discard", language.t("shell.git.discard"), language.t("shell.git.discardSuccess"), () =>
+                        gitActions.discard(props.directory!),
+                      )
+                    }
+                  />
+                ))
+              }
+            />
+          }
+        >
+          <GitButton
+            icon="outline-xmark"
+            label={language.t("shell.git.conflict.abort")}
+            loading={pending() === "abort"}
+            disabled={busy() || !props.directory}
+            onClick={() =>
+              props.directory &&
+              runAction(
+                "abort",
+                language.t("shell.git.conflict.abort"),
+                language.t("shell.git.merge.abortSuccess"),
+                () => gitActions.mergeAbort(props.directory!),
+              )
+            }
+          />
+        </Show>
+        <GitButton
           icon="outline-reset"
           label={language.t("shell.git.undoCommit")}
+          loading={pending() === "undoCommit"}
           disabled={busy() || !props.directory}
           onClick={() =>
             dialog.show(() => (
@@ -424,7 +460,14 @@ function CommitSection(props: {
                 title={language.t("shell.git.undoCommitConfirm.title")}
                 description={language.t("shell.git.undoCommitConfirm.description")}
                 confirmLabel={language.t("shell.git.undoCommit")}
-                onConfirm={() => run(() => gitActions.undoCommit(props.directory!))}
+                onConfirm={() =>
+                  runAction(
+                    "undoCommit",
+                    language.t("shell.git.undoCommit"),
+                    language.t("shell.git.undoCommitSuccess"),
+                    () => gitActions.undoCommit(props.directory!),
+                  )
+                }
               />
             ))
           }

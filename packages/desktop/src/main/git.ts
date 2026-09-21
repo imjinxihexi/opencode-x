@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process"
-import { mkdir } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
@@ -121,6 +121,20 @@ export async function merge(cwd: string, branch: string) {
   return run(cwd, ["merge", branch])
 }
 
+export async function mergePreview(cwd: string, source: string, target: string) {
+  const countOut = await run(cwd, ["rev-list", "--count", `${target}..${source}`]).catch(() => "0")
+  const commits = Number.parseInt(countOut || "0", 10) || 0
+  const conflicts = await execFileAsync("git", ["merge-tree", "--write-tree", target, source], {
+    cwd,
+    windowsHide: true,
+    maxBuffer: 10 * 1024 * 1024,
+  }).then(
+    () => false,
+    (error: { code?: number }) => error?.code === 1,
+  )
+  return { commits, conflicts }
+}
+
 export async function currentBranch(cwd: string) {
   return run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).catch(() => "")
 }
@@ -140,6 +154,17 @@ export async function conflicts(cwd: string) {
 
 export async function resolveConflict(cwd: string, file: string, side: "ours" | "theirs") {
   await run(cwd, ["checkout", side === "ours" ? "--ours" : "--theirs", "--", file])
+  await run(cwd, ["add", "--", file])
+}
+
+export async function conflictSides(cwd: string, file: string) {
+  const stage = async (n: number) => run(cwd, ["show", `:${n}:${file}`]).catch(() => "")
+  const [base, ours, theirs] = await Promise.all([stage(1), stage(2), stage(3)])
+  return { base, ours, theirs }
+}
+
+export async function writeResolved(cwd: string, file: string, content: string) {
+  await writeFile(join(cwd, file), content, "utf8")
   await run(cwd, ["add", "--", file])
 }
 

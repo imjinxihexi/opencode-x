@@ -13,11 +13,14 @@ type GitBridge = {
   gitPush?: (cwd: string) => Promise<string>
   gitDiscard?: (cwd: string) => Promise<void>
   gitMerge?: (cwd: string, branch: string) => Promise<string>
+  gitMergePreview?: (cwd: string, source: string, target: string) => Promise<{ commits: number; conflicts: boolean }>
   gitCurrentBranch?: (cwd: string) => Promise<string>
   gitHasChanges?: (cwd: string) => Promise<boolean>
   gitConflicts?: (cwd: string) => Promise<string[]>
   gitResolveConflict?: (cwd: string, file: string, side: "ours" | "theirs") => Promise<void>
   gitMergeAbort?: (cwd: string) => Promise<void>
+  gitConflictSides?: (cwd: string, file: string) => Promise<{ base: string; ours: string; theirs: string }>
+  gitWriteResolved?: (cwd: string, file: string, content: string) => Promise<void>
   gitLog?: (cwd: string, limit?: number) => Promise<GitCommit[]>
   gitFileDiff?: (cwd: string, file: string) => Promise<string>
   gitStatusRaw?: (cwd: string) => Promise<GitFileStatus[]>
@@ -51,12 +54,18 @@ export const gitActions = {
   push: (cwd: string) => bridge()?.gitPush?.(cwd) ?? Promise.resolve(""),
   discard: (cwd: string) => bridge()?.gitDiscard?.(cwd) ?? Promise.resolve(),
   merge: (cwd: string, branch: string) => bridge()?.gitMerge?.(cwd, branch) ?? Promise.resolve(""),
+  mergePreview: (cwd: string, source: string, target: string) =>
+    bridge()?.gitMergePreview?.(cwd, source, target) ?? Promise.resolve({ commits: 0, conflicts: false }),
   currentBranch: (cwd: string) => bridge()?.gitCurrentBranch?.(cwd) ?? Promise.resolve(""),
   hasChanges: (cwd: string) => bridge()?.gitHasChanges?.(cwd) ?? Promise.resolve(false),
   conflicts: (cwd: string) => bridge()?.gitConflicts?.(cwd) ?? Promise.resolve([] as string[]),
   resolveConflict: (cwd: string, file: string, side: "ours" | "theirs") =>
     bridge()?.gitResolveConflict?.(cwd, file, side) ?? Promise.resolve(),
   mergeAbort: (cwd: string) => bridge()?.gitMergeAbort?.(cwd) ?? Promise.resolve(),
+  conflictSides: (cwd: string, file: string) =>
+    bridge()?.gitConflictSides?.(cwd, file) ?? Promise.resolve({ base: "", ours: "", theirs: "" }),
+  writeResolved: (cwd: string, file: string, content: string) =>
+    bridge()?.gitWriteResolved?.(cwd, file, content) ?? Promise.resolve(),
   log: (cwd: string, limit?: number) => bridge()?.gitLog?.(cwd, limit) ?? Promise.resolve([] as GitCommit[]),
   fileDiff: (cwd: string, file: string) => bridge()?.gitFileDiff?.(cwd, file) ?? Promise.resolve(""),
   status: (cwd: string) => bridge()?.gitStatusRaw?.(cwd) ?? Promise.resolve([] as GitFileStatus[]),

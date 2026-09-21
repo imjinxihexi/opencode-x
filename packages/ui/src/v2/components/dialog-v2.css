@@ -12,7 +12,7 @@
   inset: 0;
   z-index: 50;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   pointer-events: none;
 
@@ -22,6 +22,7 @@
     align-items: flex-start;
     width: 480px;
     height: 368px;
+    margin-block-start: 15vh;
     background: var(--v2-background-bg-layer-01);
     box-shadow: var(--v2-elevation-overlay);
     border-radius: 6px;
@@ -179,7 +180,7 @@
 @keyframes oc-dialog-zoom-in {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.2);
   }
   to {
     opacity: 1;
@@ -187,9 +188,22 @@
   }
 }
 
+@keyframes oc-dialog-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  [data-component="dialog-overlay"] {
+    animation: oc-dialog-overlay-in 0.2s ease-out;
+  }
+
   [data-component="dialog-v2"] [data-slot="dialog-container"] {
     transform-origin: center center;
-    animation: oc-dialog-zoom-in 0.18s cubic-bezier(0.08, 0.82, 0.17, 1);
+    animation: oc-dialog-zoom-in 0.2s cubic-bezier(0.08, 0.82, 0.17, 1);
   }
 }

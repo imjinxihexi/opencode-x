@@ -219,7 +219,7 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
   )
 
   return (
-    <Dialog fit containerClass="!w-[660px] !max-w-[calc(100vw-32px)] !mt-[12vh] !mb-auto">
+    <Dialog fit containerClass="!w-[660px] !max-w-[calc(100vw-32px)]">
       <DialogHeader>
         <DialogTitle>{language.t("shell.git.switch.title", { repo: getFilename(props.directory) })}</DialogTitle>
       </DialogHeader>

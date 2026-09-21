@@ -104,11 +104,14 @@ export type ElectronAPI = {
   gitPush: (cwd: string) => Promise<string>
   gitDiscard: (cwd: string) => Promise<void>
   gitMerge: (cwd: string, branch: string) => Promise<string>
+  gitMergePreview: (cwd: string, source: string, target: string) => Promise<{ commits: number; conflicts: boolean }>
   gitCurrentBranch: (cwd: string) => Promise<string>
   gitHasChanges: (cwd: string) => Promise<boolean>
   gitConflicts: (cwd: string) => Promise<string[]>
   gitResolveConflict: (cwd: string, file: string, side: "ours" | "theirs") => Promise<void>
   gitMergeAbort: (cwd: string) => Promise<void>
+  gitConflictSides: (cwd: string, file: string) => Promise<{ base: string; ours: string; theirs: string }>
+  gitWriteResolved: (cwd: string, file: string, content: string) => Promise<void>
   gitLog: (
     cwd: string,
     limit?: number,
