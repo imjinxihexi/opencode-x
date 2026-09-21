@@ -91,49 +91,59 @@ export function DiffPanel(props: {
       </div>
 
       <Show
-        when={diff()?.trim()}
+        when={!diff.loading}
         fallback={
-          <div class="flex flex-1 items-center justify-center text-[12px] text-v2-text-text-muted">
-            {language.t("shell.git.noDiff")}
+          <div class="flex flex-1 items-center justify-center gap-2 text-[12px] text-v2-text-text-muted">
+            <Spinner />
+            {language.t("common.loading")}
           </div>
         }
       >
-        <div class="min-h-0 flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent">
-          <div class="w-max min-w-full py-2">
-            <For each={parsed().hunks}>
-              {(hunk) => (
-                <div class="mb-2 border-b-[0.5px] border-v2-border-border-muted last:border-b-0">
-                  <div class="flex items-center gap-1 bg-v2-background-bg-layer-01 px-3 py-0.5">
-                    <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-v2-text-text-muted">{hunk[0]}</span>
-                    <button
-                      type="button"
-                      class="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none disabled:opacity-40"
-                      disabled={busy()}
-                      onClick={() => void applyHunk(hunk)}
-                    >
-                      <Show when={busy()}>
-                        <Spinner />
-                      </Show>
-                      {props.target.staged ? language.t("shell.git.unstage") : language.t("shell.git.stage")}
-                    </button>
+        <Show
+          when={diff()?.trim()}
+          fallback={
+            <div class="flex flex-1 items-center justify-center text-[12px] text-v2-text-text-muted">
+              {language.t("shell.git.noDiff")}
+            </div>
+          }
+        >
+          <div class="min-h-0 flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent">
+            <div class="w-max min-w-full py-2">
+              <For each={parsed().hunks}>
+                {(hunk) => (
+                  <div class="mb-2 border-b-[0.5px] border-v2-border-border-muted last:border-b-0">
+                    <div class="flex items-center gap-1 bg-v2-background-bg-layer-01 px-3 py-0.5">
+                      <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-v2-text-text-muted">{hunk[0]}</span>
+                      <button
+                        type="button"
+                        class="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none disabled:opacity-40"
+                        disabled={busy()}
+                        onClick={() => void applyHunk(hunk)}
+                      >
+                        <Show when={busy()}>
+                          <Spinner />
+                        </Show>
+                        {props.target.staged ? language.t("shell.git.unstage") : language.t("shell.git.stage")}
+                      </button>
+                    </div>
+                    <Show when={!split()} fallback={<DiffSplit hunk={hunk} />}>
+                      <For each={toUnified(hunk)}>
+                        {(row) => (
+                          <div class={`flex whitespace-pre font-mono text-[11px] leading-4 ${rowClass(row.kind)}`}>
+                            <span class="w-10 shrink-0 select-none px-1 text-end text-v2-text-text-muted opacity-60">
+                              {row.right ?? row.left ?? ""}
+                            </span>
+                            <span class="min-w-0 flex-1 pe-3">{row.text}</span>
+                          </div>
+                        )}
+                      </For>
+                    </Show>
                   </div>
-                  <Show when={!split()} fallback={<DiffSplit hunk={hunk} />}>
-                    <For each={toUnified(hunk)}>
-                      {(row) => (
-                        <div class={`flex whitespace-pre font-mono text-[11px] leading-4 ${rowClass(row.kind)}`}>
-                          <span class="w-10 shrink-0 select-none px-1 text-end text-v2-text-text-muted opacity-60">
-                            {row.right ?? row.left ?? ""}
-                          </span>
-                          <span class="min-w-0 flex-1 pe-3">{row.text}</span>
-                        </div>
-                      )}
-                    </For>
-                  </Show>
-                </div>
-              )}
-            </For>
+                )}
+              </For>
+            </div>
           </div>
-        </div>
+        </Show>
       </Show>
 
       <ResizeHandle

@@ -187,7 +187,7 @@ export function StagingChanges(props: {
   }
 
   return (
-    <div class="flex max-h-[60vh] flex-col gap-2 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent">
+    <div class="flex max-h-[40vh] flex-col gap-2 overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent">
       <Show when={staged().length > 0}>
         <div class="flex flex-col">
           <div class="flex items-center gap-1 px-1">

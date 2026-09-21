@@ -28,6 +28,7 @@ type GitBridge = {
   gitStagedFileDiff?: (cwd: string, file: string) => Promise<string>
   gitApplyCached?: (cwd: string, text: string, reverse: boolean) => Promise<void>
   gitUndoCommit?: (cwd: string) => Promise<void>
+  gitStash?: (cwd: string) => Promise<void>
   gitClone?: (url: string, workspace: string, name: string, branch?: string) => Promise<string>
   gitRemoteBranches?: (cwd: string) => Promise<string[]>
 }
@@ -75,6 +76,7 @@ export const gitActions = {
   applyCached: (cwd: string, text: string, reverse: boolean) =>
     bridge()?.gitApplyCached?.(cwd, text, reverse) ?? Promise.resolve(),
   undoCommit: (cwd: string) => bridge()?.gitUndoCommit?.(cwd) ?? Promise.resolve(),
+  stash: (cwd: string) => bridge()?.gitStash?.(cwd) ?? Promise.resolve(),
   clone: (url: string, workspace: string, name: string, branch?: string) =>
     bridge()?.gitClone?.(url, workspace, name, branch) ?? Promise.resolve(""),
   remoteBranches: (cwd: string) => bridge()?.gitRemoteBranches?.(cwd) ?? Promise.resolve([] as string[]),

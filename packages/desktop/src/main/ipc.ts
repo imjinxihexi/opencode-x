@@ -45,9 +45,10 @@ import {
   push as gitPush,
   remoteBranches as gitRemoteBranches,
   resolveConflict as gitResolveConflict,
-  stageFile as gitStageFile,
   stageAll as gitStageAll,
+  stageFile as gitStageFile,
   stagedFileDiff as gitStagedFileDiff,
+  stash as gitStash,
   statusRaw as gitStatusRaw,
   undoCommit as gitUndoCommit,
   unstageAll as gitUnstageAll,
@@ -129,6 +130,7 @@ export function registerIpcHandlers(deps: Deps) {
     gitApplyCached(cwd, text, reverse),
   )
   ipcMain.handle("git-undo-commit", (_event: IpcMainInvokeEvent, cwd: string) => gitUndoCommit(cwd))
+  ipcMain.handle("git-stash", (_event: IpcMainInvokeEvent, cwd: string) => gitStash(cwd))
   ipcMain.handle("git-clone", (_event: IpcMainInvokeEvent, url: string, workspace: string, name: string, branch?: string) =>
     gitClone(url, workspace, name, branch),
   )

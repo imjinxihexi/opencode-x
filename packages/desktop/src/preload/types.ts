@@ -122,6 +122,7 @@ export type ElectronAPI = {
   gitStagedFileDiff: (cwd: string, file: string) => Promise<string>
   gitApplyCached: (cwd: string, text: string, reverse: boolean) => Promise<void>
   gitUndoCommit: (cwd: string) => Promise<void>
+  gitStash: (cwd: string) => Promise<void>
   gitClone: (url: string, workspace: string, name: string, branch?: string) => Promise<string>
   gitRemoteBranches: (cwd: string) => Promise<string[]>
   getWindowFocused: () => Promise<boolean>

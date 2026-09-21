@@ -804,6 +804,11 @@ export const dict = {
   "shell.git.switch.favorite": "Favorite",
   "shell.git.switch.copy": "Copy branch name",
   "shell.git.switch.total": "{{count}} branches",
+  "shell.git.dirtySwitch.title": "Uncommitted changes",
+  "shell.git.dirtySwitch.description":
+    "The working tree has uncommitted changes. Continuing carries them over to \"{{branch}}\"; or stash them first.",
+  "shell.git.dirtySwitch.continue": "Switch anyway",
+  "shell.git.dirtySwitch.stash": "Stash and switch",
   "shell.git.noDiff": "No diff content",
   "shell.git.diff.unified": "Unified view",
   "shell.git.diff.split": "Split view",

@@ -85,6 +85,10 @@ export async function pull(cwd: string) {
   return run(cwd, ["pull"])
 }
 
+export async function stash(cwd: string) {
+  await run(cwd, ["stash", "push", "-u"])
+}
+
 export async function deleteBranch(cwd: string, name: string) {
   await run(cwd, ["branch", "-D", name])
 }
@@ -118,11 +122,11 @@ export async function merge(cwd: string, branch: string) {
 }
 
 export async function currentBranch(cwd: string) {
-  return run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"])
+  return run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).catch(() => "")
 }
 
 export async function hasTrackedChanges(cwd: string) {
-  const output = await run(cwd, ["status", "--porcelain=v1", "--untracked-files=no"])
+  const output = await run(cwd, ["status", "--porcelain=v1", "--untracked-files=all"]).catch(() => "")
   return output.trim().length > 0
 }
 
@@ -175,8 +179,15 @@ export async function fileDiff(cwd: string, file: string) {
   )
 }
 
+async function runRaw(cwd: string, args: string[]) {
+  return execFileAsync("git", args, { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }).then(
+    (result) => result.stdout,
+    (error: { stdout?: string }) => error.stdout ?? "",
+  )
+}
+
 export async function statusRaw(cwd: string): Promise<GitFileStatus[]> {
-  const output = await run(cwd, ["status", "--porcelain=v1", "--untracked-files=all", "-z", "--", "."])
+  const output = await runRaw(cwd, ["status", "--porcelain=v1", "--untracked-files=all", "-z", "--", "."])
   return output
     .split("\0")
     .filter(Boolean)

@@ -6,6 +6,7 @@ import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { createStore } from "solid-js/store"
+import { DialogDirtySwitch } from "@/components/shell/dialog-dirty-switch"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
@@ -82,14 +83,11 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
     onCleanup(() => document.removeEventListener("mousedown", onDown))
   })
 
-  const switchTo = async (branch: GitBranch) => {
-    if (branch.current) {
-      dialog.close()
-      return
-    }
+  const checkout = async (branch: string, stashFirst: boolean) => {
     setBusy(true)
     try {
-      await gitActions.checkout(props.directory, branch.name)
+      if (stashFirst) await gitActions.stash(props.directory)
+      await gitActions.checkout(props.directory, branch)
       props.onSwitched()
       dialog.close()
     } catch (error) {
@@ -101,6 +99,25 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
     } finally {
       setBusy(false)
     }
+  }
+
+  const switchTo = async (branch: GitBranch) => {
+    if (branch.current) {
+      dialog.close()
+      return
+    }
+    const dirty = await gitActions.hasChanges(props.directory).catch(() => false)
+    if (dirty) {
+      dialog.show(() => (
+        <DialogDirtySwitch
+          branch={branch.name}
+          onContinue={() => void checkout(branch.name, false)}
+          onStash={() => void checkout(branch.name, true)}
+        />
+      ))
+      return
+    }
+    void checkout(branch.name, false)
   }
 
   const copy = (name: string) => {
@@ -125,14 +142,14 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
 
   const RemoteRow = (rowProps: { name: string }) => (
     <div
-      class="flex min-w-0 cursor-pointer items-center gap-2 px-2 py-1.5 hover:bg-v2-overlay-simple-overlay-hover"
+      class="mx-2 flex min-w-0 cursor-pointer items-center gap-2 rounded-md ps-3 pe-3 py-1.5 hover:bg-v2-overlay-simple-overlay-hover"
       onClick={() => void switchTo({ name: rowProps.name.replace(/^[^/]+\//, ""), current: false })}
       title={rowProps.name}
     >
       <span class="min-w-0 flex-1 truncate text-[13px] leading-5 text-v2-text-text-base">{rowProps.name}</span>
       <button
         type="button"
-        class="flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+        class="flex size-6 shrink-0 items-center justify-center rounded-sm text-[16px] leading-none hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
         classList={{
           "text-[#d29922]": favNames().includes(rowProps.name),
           "text-v2-icon-icon-muted": !favNames().includes(rowProps.name),
@@ -161,8 +178,8 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
 
   const Row = (rowProps: { branch: GitBranch }) => (
     <div
-      class="flex min-w-0 cursor-pointer items-center gap-2 px-2 py-1.5 hover:bg-v2-overlay-simple-overlay-hover"
-      classList={{ "bg-v2-overlay-simple-overlay-pressed": rowProps.branch.current }}
+      class="mx-2 flex min-w-0 cursor-pointer items-center gap-2 rounded-md ps-3 pe-3 py-1.5 hover:bg-v2-overlay-simple-overlay-hover"
+      classList={{ "bg-[#F0F3FF]": rowProps.branch.current }}
       onClick={() => void switchTo(rowProps.branch)}
       title={rowProps.branch.name}
     >
@@ -174,7 +191,7 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
       </Show>
       <button
         type="button"
-        class="flex size-6 shrink-0 items-center justify-center rounded-sm hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+        class="flex size-6 shrink-0 items-center justify-center rounded-sm text-[16px] leading-none hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
         classList={{
           "text-[#d29922]": favNames().includes(rowProps.branch.name),
           "text-v2-icon-icon-muted": !favNames().includes(rowProps.branch.name),
@@ -202,7 +219,7 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
   )
 
   return (
-    <Dialog fit>
+    <Dialog fit containerClass="!w-[660px] !max-w-[calc(100vw-32px)] !mt-[12vh] !mb-auto">
       <DialogHeader>
         <DialogTitle>{language.t("shell.git.switch.title", { repo: getFilename(props.directory) })}</DialogTitle>
       </DialogHeader>
@@ -228,7 +245,7 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
         <Show when={open()}>
           <div
             data-branch-list
-            class="flex max-h-[320px] w-full flex-col overflow-y-auto rounded-md border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base py-1"
+            class="flex max-h-[320px] w-full flex-col overflow-y-auto rounded-md border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base py-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent"
           >
             <Show
               when={!branches.loading}
@@ -240,17 +257,17 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
               }
             >
               <Show when={favoriteList().length > 0}>
-                <div class="px-2 py-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
+                <div class="mb-1 px-2 py-1 text-[10px] font-[530] uppercase leading-4 tracking-[0.08px] text-[rgba(0,0,0,0.45)]">
                   {language.t("shell.git.switch.favorites")}
                 </div>
                 <For each={favoriteList()}>{(branch) => <Row branch={branch} />}</For>
               </Show>
-              <div class="px-2 py-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
+              <div class="mb-1 px-2 py-1 text-[10px] font-[530] uppercase leading-4 tracking-[0.08px] text-[rgba(0,0,0,0.45)]">
                 {language.t("shell.git.switch.others")}
               </div>
               <For each={otherList()}>{(branch) => <Row branch={branch} />}</For>
-              <div class="flex items-center gap-1 px-2 py-1">
-                <span class="flex-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
+              <div class="mb-1 flex items-center gap-2 px-2 py-1">
+                <span class="text-[10px] font-[530] uppercase leading-4 tracking-[0.08px] text-[rgba(0,0,0,0.45)]">
                   {language.t("shell.git.switch.remote")}
                 </span>
                 <button

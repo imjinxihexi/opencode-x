@@ -127,6 +127,7 @@ const api: ElectronAPI = {
   gitStagedFileDiff: (cwd, file) => ipcRenderer.invoke("git-staged-file-diff", cwd, file),
   gitApplyCached: (cwd, text, reverse) => ipcRenderer.invoke("git-apply-cached", cwd, text, reverse),
   gitUndoCommit: (cwd) => ipcRenderer.invoke("git-undo-commit", cwd),
+  gitStash: (cwd) => ipcRenderer.invoke("git-stash", cwd),
   gitClone: (url, workspace, name, branch) => ipcRenderer.invoke("git-clone", url, workspace, name, branch),
   gitRemoteBranches: (cwd) => ipcRenderer.invoke("git-remote-branches", cwd),
   getWindowFocused: () => ipcRenderer.invoke("get-window-focused"),
