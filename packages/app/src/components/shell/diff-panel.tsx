@@ -1,12 +1,13 @@
 import { For, Show, createMemo, createResource, createSignal } from "solid-js"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Icon } from "@opencode-ai/ui/v2/icon"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { gitActions } from "@/components/shell/git-actions"
 import { ConflictMerge } from "@/components/shell/conflict-merge"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { rowClass, splitHunks, toSplit, toUnified, type UnifiedRow } from "@/components/shell/staging-changes"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
-import { showToast } from "@/utils/toast"
 
 export type DiffTarget = { directory: string; file: string; staged: boolean }
 
@@ -23,6 +24,7 @@ export function DiffPanel(props: {
   onResolved: () => void
 }) {
   const language = useLanguage()
+  const dialog = useDialog()
   const [split, setSplit] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
   const [rev, setRev] = createSignal(0)
@@ -35,6 +37,13 @@ export function DiffPanel(props: {
 
   const parsed = createMemo(() => splitHunks(diff() ?? ""))
 
+  const isNewFile = createMemo(() => {
+    const header = parsed().header.join("\n")
+    return /new file mode|^--- \/dev\/null/m.test(header)
+  })
+
+  const canApplyHunk = () => !(!props.target.staged && isNewFile())
+
   const applyHunk = async (hunk: string[]) => {
     const text = [...parsed().header, ...hunk].join("\n") + "\n"
     setBusy(true)
@@ -43,11 +52,13 @@ export function DiffPanel(props: {
       setRev((value) => value + 1)
       props.onChanged()
     } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.actionFailed")}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
     } finally {
       setBusy(false)
     }
@@ -125,7 +136,8 @@ export function DiffPanel(props: {
                       <button
                         type="button"
                         class="flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-[11px] text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none disabled:opacity-40"
-                        disabled={busy()}
+                        disabled={busy() || !canApplyHunk()}
+                        title={!canApplyHunk() ? language.t("shell.git.hunkNewFile") : undefined}
                         onClick={() => void applyHunk(hunk)}
                       >
                         <Show when={busy()}>

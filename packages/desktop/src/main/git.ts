@@ -91,15 +91,45 @@ export async function fetchRemote(cwd: string) {
 }
 
 export async function pull(cwd: string) {
-  return run(cwd, ["pull"])
+  try {
+    const output = await run(cwd, ["pull"])
+    return { conflicted: false, output }
+  } catch (error) {
+    const conflictedFiles = await conflicts(cwd).catch(() => [] as string[])
+    if (conflictedFiles.length > 0) return { conflicted: true, output: "" }
+    throw error
+  }
 }
 
 export async function stash(cwd: string) {
   await run(cwd, ["stash", "push", "-u"])
 }
 
-export async function deleteBranch(cwd: string, name: string) {
-  await run(cwd, ["branch", "-D", name])
+export async function stashList(cwd: string): Promise<{ ref: string; message: string }[]> {
+  const output = await run(cwd, ["stash", "list", "--format=%gd%x1f%gs"]).catch(() => "")
+  return output
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [ref, message] = line.split("\x1f")
+      return { ref: ref ?? "", message: message ?? "" }
+    })
+}
+
+export async function stashApply(cwd: string, ref: string) {
+  await run(cwd, ["stash", "apply", ref])
+}
+
+export async function stashPop(cwd: string, ref: string) {
+  await run(cwd, ["stash", "pop", ref])
+}
+
+export async function stashDrop(cwd: string, ref: string) {
+  await run(cwd, ["stash", "drop", ref])
+}
+
+export async function deleteBranch(cwd: string, name: string, force?: boolean) {
+  await run(cwd, ["branch", force ? "-D" : "-d", name])
 }
 
 export async function commit(cwd: string, message: string) {
@@ -110,15 +140,29 @@ export async function undoCommit(cwd: string) {
   await run(cwd, ["reset", "--soft", "HEAD~1"])
 }
 
+export async function undoCommitInfo(cwd: string) {
+  const root = await run(cwd, ["rev-parse", "--verify", "--quiet", "HEAD~1"]).then(
+    () => false,
+    () => true,
+  )
+  const pushed = await run(cwd, ["branch", "-r", "--contains", "HEAD"]).then(
+    (output) => output.trim().length > 0,
+    () => false,
+  )
+  return { root, pushed }
+}
+
 export async function push(cwd: string) {
-  try {
-    return await run(cwd, ["push"])
-  } catch {
-    const branch = await run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"])
-    const remote = await primaryRemote(cwd)
-    if (!branch || !remote) throw new Error("No upstream branch and no remote to push to")
-    return run(cwd, ["push", "-u", remote, branch])
-  }
+  const upstream = await run(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).catch(() => "")
+  if (upstream) return run(cwd, ["push"])
+  const branch = await run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).catch(() => "")
+  const remote = await primaryRemote(cwd).catch(() => undefined)
+  if (!branch || branch === "HEAD" || !remote) throw new Error("No upstream branch and no remote to push to")
+  return run(cwd, ["push", "-u", remote, branch])
+}
+
+export async function pushForce(cwd: string) {
+  return run(cwd, ["push", "--force-with-lease"])
 }
 
 export async function discard(cwd: string) {
@@ -227,7 +271,15 @@ async function runRaw(cwd: string, args: string[]) {
 }
 
 export async function statusRaw(cwd: string): Promise<GitFileStatus[]> {
-  const output = await runRaw(cwd, ["status", "--porcelain=v1", "--untracked-files=all", "-z", "--", "."])
+  const output = await runRaw(cwd, [
+    "status",
+    "--porcelain=v1",
+    "--untracked-files=all",
+    "--no-renames",
+    "-z",
+    "--",
+    ".",
+  ])
   return output
     .split("\0")
     .filter(Boolean)

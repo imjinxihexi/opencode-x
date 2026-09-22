@@ -45,15 +45,21 @@ import {
   mergePreview as gitMergePreview,
   pull as gitPull,
   push as gitPush,
+  pushForce as gitPushForce,
   remoteBranches as gitRemoteBranches,
   resolveConflict as gitResolveConflict,
   stageAll as gitStageAll,
   stageFile as gitStageFile,
   stagedFileDiff as gitStagedFileDiff,
   stash as gitStash,
+  stashApply as gitStashApply,
+  stashDrop as gitStashDrop,
+  stashList as gitStashList,
+  stashPop as gitStashPop,
   statusRaw as gitStatusRaw,
   switchBranch as gitSwitchBranch,
   undoCommit as gitUndoCommit,
+  undoCommitInfo as gitUndoCommitInfo,
   unstageAll as gitUnstageAll,
   unstageFile as gitUnstageFile,
   writeResolved as gitWriteResolved,
@@ -107,11 +113,12 @@ export function registerIpcHandlers(deps: Deps) {
   )
   ipcMain.handle("git-fetch", (_event: IpcMainInvokeEvent, cwd: string) => gitFetch(cwd))
   ipcMain.handle("git-pull", (_event: IpcMainInvokeEvent, cwd: string) => gitPull(cwd))
-  ipcMain.handle("git-delete-branch", (_event: IpcMainInvokeEvent, cwd: string, name: string) =>
-    gitDeleteBranch(cwd, name),
+  ipcMain.handle("git-delete-branch", (_event: IpcMainInvokeEvent, cwd: string, name: string, force?: boolean) =>
+    gitDeleteBranch(cwd, name, force),
   )
   ipcMain.handle("git-commit", (_event: IpcMainInvokeEvent, cwd: string, message: string) => gitCommit(cwd, message))
   ipcMain.handle("git-push", (_event: IpcMainInvokeEvent, cwd: string) => gitPush(cwd))
+  ipcMain.handle("git-push-force", (_event: IpcMainInvokeEvent, cwd: string) => gitPushForce(cwd))
   ipcMain.handle("git-discard", (_event: IpcMainInvokeEvent, cwd: string) => gitDiscard(cwd))
   ipcMain.handle("git-merge", (_event: IpcMainInvokeEvent, cwd: string, branch: string) => gitMerge(cwd, branch))
   ipcMain.handle("git-merge-preview", (_event: IpcMainInvokeEvent, cwd: string, source: string, target: string) =>
@@ -146,7 +153,12 @@ export function registerIpcHandlers(deps: Deps) {
     gitApplyCached(cwd, text, reverse),
   )
   ipcMain.handle("git-undo-commit", (_event: IpcMainInvokeEvent, cwd: string) => gitUndoCommit(cwd))
+  ipcMain.handle("git-undo-commit-info", (_event: IpcMainInvokeEvent, cwd: string) => gitUndoCommitInfo(cwd))
   ipcMain.handle("git-stash", (_event: IpcMainInvokeEvent, cwd: string) => gitStash(cwd))
+  ipcMain.handle("git-stash-list", (_event: IpcMainInvokeEvent, cwd: string) => gitStashList(cwd))
+  ipcMain.handle("git-stash-apply", (_event: IpcMainInvokeEvent, cwd: string, ref: string) => gitStashApply(cwd, ref))
+  ipcMain.handle("git-stash-pop", (_event: IpcMainInvokeEvent, cwd: string, ref: string) => gitStashPop(cwd, ref))
+  ipcMain.handle("git-stash-drop", (_event: IpcMainInvokeEvent, cwd: string, ref: string) => gitStashDrop(cwd, ref))
   ipcMain.handle("git-clone", (_event: IpcMainInvokeEvent, url: string, workspace: string, name: string, branch?: string) =>
     gitClone(url, workspace, name, branch),
   )

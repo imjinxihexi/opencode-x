@@ -2,12 +2,13 @@ import { For, createSignal } from "solid-js"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogConfirm } from "@/components/shell/dialog-confirm"
 import { DialogCreateBranch } from "@/components/shell/dialog-create-branch"
 import { DialogGitResult } from "@/components/shell/dialog-git-result"
+import { DialogStash } from "@/components/shell/dialog-stash"
 import { DialogSwitchBranch } from "@/components/shell/dialog-switch-branch"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
 import { useLanguage } from "@/context/language"
-import { showToast } from "@/utils/toast"
 
 export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
   const language = useLanguage()
@@ -35,6 +36,65 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
       dialog.show(() => (
         <DialogGitResult
           title={title}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
+    }
+  }
+
+  const removeBranch = async (branch: GitBranch) => {
+    try {
+      await gitActions.deleteBranch(props.directory, branch.name)
+      props.onRefresh()
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.menu.delete")}
+          status="done"
+          successLabel={language.t("shell.git.deleteBranchSuccess")}
+        />
+      ))
+    } catch {
+      dialog.show(() => (
+        <DialogConfirm
+          title={language.t("shell.git.deleteBranchForce.title")}
+          description={language.t("shell.git.deleteBranchForce.description", { name: branch.name })}
+          confirmLabel={language.t("shell.git.deleteBranchForce.confirm")}
+          onConfirm={() =>
+            act(language.t("shell.git.menu.delete"), language.t("shell.git.deleteBranchSuccess"), () =>
+              gitActions.deleteBranch(props.directory, branch.name, true),
+            )
+          }
+        />
+      ))
+    }
+  }
+
+  const pullRemote = async () => {
+    try {
+      const result = await gitActions.pull(props.directory)
+      props.onRefresh()
+      if (result.conflicted) {
+        dialog.show(() => (
+          <DialogGitResult
+            title={language.t("shell.git.menu.pull")}
+            status="error"
+            message={language.t("shell.git.pullConflict")}
+          />
+        ))
+        return
+      }
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.menu.pull")}
+          status="done"
+          successLabel={language.t("shell.git.pullSuccess")}
+        />
+      ))
+    } catch (error) {
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.menu.pull")}
           status="error"
           message={error instanceof Error ? error.message : String(error)}
         />
@@ -76,15 +136,18 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
             <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.newBranch")}</span>
           </MenuV2.Item>
 
-          <MenuV2.Item
-            onSelect={() =>
-              void act(language.t("shell.git.menu.pull"), language.t("shell.git.pullSuccess"), () =>
-                gitActions.pull(props.directory),
-              )
-            }
-          >
+          <MenuV2.Item onSelect={() => void pullRemote()}>
             <Icon name="outline-share" size="small" />
             <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.pull")}</span>
+          </MenuV2.Item>
+
+          <MenuV2.Item
+            onSelect={() =>
+              dialog.show(() => <DialogStash directory={props.directory} onChanged={props.onRefresh} />)
+            }
+          >
+            <Icon name="archive" size="small" />
+            <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.stash")}</span>
           </MenuV2.Item>
 
           <MenuV2.Item onSelect={() => props.onRefresh()}>
@@ -103,15 +166,7 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
               <MenuV2.SubContent class="max-w-[260px]">
                 <For each={branches().filter((branch) => !branch.current)}>
                   {(branch) => (
-                    <MenuV2.Item
-                      onSelect={() =>
-                        void act(
-                          language.t("shell.git.menu.delete"),
-                          language.t("shell.git.deleteBranchSuccess"),
-                          () => gitActions.deleteBranch(props.directory, branch.name),
-                        )
-                      }
-                    >
+                    <MenuV2.Item onSelect={() => void removeBranch(branch)}>
                       <Icon name="branch" size="small" />
                       <span class="min-w-0 flex-1 truncate">{branch.name}</span>
                     </MenuV2.Item>

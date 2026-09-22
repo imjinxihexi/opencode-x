@@ -15,7 +15,10 @@ import { createWorkspaceStore, type Workspace } from "@/components/shell/workspa
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { useLayout } from "@/context/layout"
 import { usePlatform } from "@/context/platform"
+import type { PromptSession } from "@/context/prompt"
+import { useServer } from "@/context/server"
 import { useServerSDK } from "@/context/server-sdk"
+import { useTabs } from "@/context/tabs"
 import { Persist, persisted } from "@/utils/persist"
 import { setV2Toast, ToastRegion } from "@/utils/toast"
 
@@ -37,6 +40,27 @@ export default function NewLayout(props: ParentProps) {
   const [panels, setPanels] = persisted(Persist.global("shell-panels"), createStore({ left: 236, right: 300, diff: 420 }))
   const [diffTarget, setDiffTarget] = createSignal<DiffTarget>()
   const [gitRefresh, setGitRefresh] = createSignal(0)
+  const server = useServer()
+  const tabs = useTabs()
+
+  const activeModel = createMemo(() => {
+    const route = layout.route()
+    const tab =
+      route.type === "session"
+        ? ({ type: "session", server: route.server ?? server.key, sessionId: route.sessionId } as const)
+        : route.type === "draft"
+          ? tabs.store.find((item) => item.type === "draft" && item.draftID === route.draftID)
+          : undefined
+    if (!tab) return undefined
+    const model = tabs.stateValue<PromptSession>(tab, "prompt")?.model.current()
+    if (!model) return undefined
+    return { providerID: model.providerID, modelID: model.modelID }
+  })
+
+  const activeSessionId = createMemo(() => {
+    const route = layout.route()
+    return route.type === "session" ? route.sessionId : undefined
+  })
 
   createEffect(() => setV2Toast(true))
 
@@ -214,6 +238,8 @@ export default function NewLayout(props: ParentProps) {
           onOpenDiff={(target) => setDiffTarget(target)}
           hideResize={Boolean(diffTarget())}
           conflicts={conflicts() ?? []}
+          activeModel={activeModel()}
+          activeSessionId={activeSessionId()}
         />
         <Show when={diffTarget()}>
           {(target) => (

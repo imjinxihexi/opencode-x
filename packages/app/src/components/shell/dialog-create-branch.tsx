@@ -5,10 +5,10 @@ import { Field } from "@opencode-ai/ui/v2/field-v2"
 import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
-import { showToast } from "@/utils/toast"
 
 type CreateMode = "remote" | "local"
 
@@ -51,11 +51,13 @@ export function DialogCreateBranch(props: { directory: string; onCreated: () => 
       props.onCreated()
       dialog.close()
     } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.actionFailed")}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
     } finally {
       setBusy(false)
     }

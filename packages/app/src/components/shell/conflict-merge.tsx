@@ -5,10 +5,11 @@ import { EditorView } from "@codemirror/view"
 import { history, historyKeymap, defaultKeymap } from "@codemirror/commands"
 import { MergeView } from "@codemirror/merge"
 import { Icon } from "@opencode-ai/ui/v2/icon"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { gitActions } from "@/components/shell/git-actions"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
-import { showToast } from "@/utils/toast"
 
 function baseTheme() {
   return [
@@ -23,6 +24,7 @@ function baseTheme() {
 
 export function ConflictMerge(props: { directory: string; file: string; onResolved: () => void }) {
   const language = useLanguage()
+  const dialog = useDialog()
   let host: HTMLDivElement | undefined
   let view: MergeView | undefined
 
@@ -70,11 +72,13 @@ export function ConflictMerge(props: { directory: string; file: string; onResolv
       await gitActions.writeResolved(props.directory, props.file, current())
       props.onResolved()
     } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.actionFailed")}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
     }
   }
 

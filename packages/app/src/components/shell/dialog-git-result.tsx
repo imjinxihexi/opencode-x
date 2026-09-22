@@ -1,6 +1,7 @@
 import { Show, onMount } from "solid-js"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
+import { Icon } from "@opencode-ai/ui/v2/icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
@@ -34,6 +35,12 @@ export function DialogGitResult(props: {
         <div class="flex items-center justify-center gap-2 text-[13px] leading-5 text-v2-text-text-base">
           <Show when={props.status === "running"}>
             <Spinner />
+          </Show>
+          <Show when={props.status === "done"}>
+            <Icon name="check" size="small" class="text-[#3fb950]" />
+          </Show>
+          <Show when={props.status === "error"}>
+            <Icon name="warning" size="small" class="text-[#f85149]" />
           </Show>
           <span classList={{ "text-[#f85149]": props.status === "error" }}>{label()}</span>
         </div>

@@ -9,13 +9,13 @@ import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { DialogGitRun } from "@/components/shell/dialog-git-run"
 import { DialogMerge } from "@/components/shell/dialog-merge"
 import { GitButton } from "@/components/shell/git-button"
-import { gitActions, type GitCommit } from "@/components/shell/git-actions"
+import { gitActions, type GitCommit, type GitFileStatus } from "@/components/shell/git-actions"
 import type { Repo } from "@/components/shell/repos"
 import { Spinner } from "@/components/shell/spinner"
 import { StagingChanges } from "@/components/shell/staging-changes"
 import { useLanguage } from "@/context/language"
+import { useModels } from "@/context/models"
 import { useServerSDK } from "@/context/server-sdk"
-import { showToast } from "@/utils/toast"
 
 type GitTab = "files" | "commit"
 type Entry = { name: string; path: string; absolute: string; type: "file" | "directory"; ignored: boolean }
@@ -35,6 +35,8 @@ export function GitPanel(props: {
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
   hideResize?: boolean
   conflicts: string[]
+  activeModel?: { providerID: string; modelID: string }
+  activeSessionId?: string
 }) {
   const language = useLanguage()
   const sdk = useServerSDK()
@@ -174,6 +176,8 @@ export function GitPanel(props: {
                   onRefresh={props.onRefresh}
                   activeFile={props.activeFile}
                   onOpenDiff={props.onOpenDiff}
+                  activeModel={props.activeModel}
+                  activeSessionId={props.activeSessionId}
                 />
               }
             >
@@ -230,14 +234,137 @@ function CommitSection(props: {
   onRefresh: () => void
   activeFile?: string
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
+  activeModel?: { providerID: string; modelID: string }
+  activeSessionId?: string
 }) {
   const language = useLanguage()
   const dialog = useDialog()
+  const sdk = useServerSDK()
+  const models = useModels()
   const [busy, setBusy] = createSignal(false)
   const [stagedCount, setStagedCount] = createSignal(0)
   const [totalCount, setTotalCount] = createSignal(0)
   const [pending, setPending] = createSignal<string>()
   const [commits, setCommits] = createSignal<GitCommit[]>([])
+  const [generating, setGenerating] = createSignal(false)
+  const [changesOpen, setChangesOpen] = createSignal(true)
+
+  const collectDiff = async (directory: string) => {
+    const status = await gitActions.status(directory).catch(() => [] as GitFileStatus[])
+    const stagedFiles = status.filter((item) => item.index !== " " && item.index !== "?")
+    const useStaged = stagedFiles.length > 0
+    const files = useStaged ? stagedFiles : status
+    const chunks: string[] = []
+    for (const item of files.slice(0, 30)) {
+      const patch = useStaged
+        ? await gitActions.stagedFileDiff(directory, item.file)
+        : await gitActions.fileDiff(directory, item.file)
+      if (patch.trim()) chunks.push(`### ${item.file}\n${patch}`)
+    }
+    return chunks.join("\n\n")
+  }
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const generateMessage = async () => {
+    const directory = props.directory
+    if (!directory || generating()) return
+    setGenerating(true)
+    try {
+      const client = sdk().client
+      if (!client.session?.promptAsync || !client.session?.create || !client.session?.messages) {
+        throw new Error(language.t("shell.git.generate.unsupported"))
+      }
+      let key = props.activeModel
+      if (!key && props.activeSessionId) {
+        const info = (await client.session.get({ sessionID: props.activeSessionId }).catch(() => undefined)) as unknown as
+          | { data?: { model?: { id?: string; providerID?: string } }; model?: { id?: string; providerID?: string } }
+          | undefined
+        const sessionModel = info?.data?.model ?? info?.model
+        if (sessionModel?.id && sessionModel.providerID) key = { providerID: sessionModel.providerID, modelID: sessionModel.id }
+      }
+      const recent = models.recent.list()[0]
+      const model =
+        (key ? models.find(key) : undefined) ??
+        (recent ? models.find(recent) : undefined) ??
+        models.list().find((item) => models.visible({ providerID: item.provider.id, modelID: item.id }))
+      if (!model) throw new Error(language.t("shell.git.generate.noModel"))
+      const diff = await collectDiff(directory)
+      if (!diff.trim()) throw new Error(language.t("shell.git.generate.noChanges"))
+
+      const created = (await client.session.create({
+        directory,
+        model: { id: model.id, providerID: model.provider.id },
+      })) as unknown as { data?: { id?: string }; id?: string }
+      const sessionID = created?.data?.id ?? created?.id
+      if (!sessionID) throw new Error(language.t("shell.git.generate.unsupported"))
+
+      try {
+        const zh = language.locale().startsWith("zh")
+        const system = zh
+          ? "你是 Git 提交信息生成助手。根据提供的代码改动生成一条简洁、准确的提交信息。只输出提交信息本身，不要引号、代码块或任何解释。格式为 Conventional Commits：类型前缀（feat、fix、refactor、chore、docs、style、test 等）保留英文，冒号后的描述必须使用简体中文，用祈使语气，首行为简明摘要。例如：\"fix: 修复登录超时问题\"。"
+          : "You are a git commit message generator. Given the provided code changes, write one concise, accurate commit message. Output only the commit message itself, with no quotes, code fences, or explanation. Use Conventional Commits style (feat:, fix:, refactor:, ...), imperative mood, with a short summary line."
+        const text = `${zh ? "根据以下改动生成提交信息：" : "Generate a commit message for the following changes:"}\n\n${diff.slice(0, 12000)}`
+        await client.session.promptAsync({
+          sessionID,
+          directory,
+          model: { providerID: model.provider.id, modelID: model.id },
+          system,
+          tools: {},
+          parts: [{ type: "text", text }],
+        })
+
+        type Entry = {
+          info?: {
+            role?: string
+            error?: { name?: string; message?: string; data?: { message?: string } }
+          }
+          parts?: Array<{ type?: string; text?: string }>
+        }
+        const deadline = Date.now() + 120000
+        let message = ""
+        let stable = 0
+        while (Date.now() < deadline) {
+          await sleep(600)
+          const res = (await client.session.messages({ sessionID, directory })) as unknown as
+            | { data?: Entry[] }
+            | Entry[]
+          const list = Array.isArray(res) ? res : (res?.data ?? [])
+          const failed = list.find((entry) => entry?.info?.role === "assistant" && entry.info.error)
+          if (failed?.info?.error) {
+            const err = failed.info.error
+            throw new Error(err.data?.message ?? err.message ?? err.name ?? language.t("shell.git.actionFailed"))
+          }
+          const content = list
+            .filter((entry) => entry?.info?.role === "assistant")
+            .flatMap((entry) => entry.parts ?? [])
+            .filter((part) => part?.type === "text" && typeof part.text === "string")
+            .map((part) => part.text!)
+            .join("\n")
+            .trim()
+          if (content) {
+            stable = content === message ? stable + 1 : 0
+            message = content
+            if (stable >= 2) break
+          }
+        }
+        if (!message) throw new Error(language.t("shell.git.generate.empty"))
+        props.setMessage(message)
+      } finally {
+        await client.session.delete({ sessionID, directory }).catch(() => {})
+      }
+    } catch (error) {
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.generate.title")}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   const loadCommits = () => {
     const directory = props.directory
@@ -258,23 +385,6 @@ function CommitSection(props: {
     loadCommits()
   })
 
-  const run = async (action: () => Promise<unknown>) => {
-    setBusy(true)
-    try {
-      await action()
-      props.onRefresh()
-      loadCommits()
-    } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const runAction = (key: string, title: string, successLabel: string, action: () => Promise<unknown>) => {
     setPending(key)
     Promise.resolve()
@@ -293,6 +403,77 @@ function CommitSection(props: {
         ))
       })
       .finally(() => setPending(undefined))
+  }
+
+  const pushWithRecovery = async () => {
+    const directory = props.directory
+    if (!directory) return
+    setPending("push")
+    try {
+      await gitActions.push(directory)
+      props.onRefresh()
+      dialog.show(() => (
+        <DialogGitResult title={language.t("shell.git.push")} status="done" successLabel={language.t("shell.git.pushSuccess")} />
+      ))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (/rejected|non-fast-forward|fetch first|failed to push/i.test(message)) {
+        setPending(undefined)
+        dialog.show(() => (
+          <DialogConfirm
+            title={language.t("shell.git.pushRejected.title")}
+            description={language.t("shell.git.pushRejected.description")}
+            confirmLabel={language.t("shell.git.pushRejected.confirm")}
+            onConfirm={() =>
+              runAction("push", language.t("shell.git.push"), language.t("shell.git.pushForceSuccess"), () =>
+                gitActions.pushForce(directory),
+              )
+            }
+          />
+        ))
+        return
+      }
+      dialog.show(() => (
+        <DialogGitResult title={language.t("shell.git.push")} status="error" message={message} />
+      ))
+    } finally {
+      setPending(undefined)
+    }
+  }
+
+  const requestUndoCommit = async () => {
+    const directory = props.directory
+    if (!directory) return
+    const info = await gitActions.undoCommitInfo(directory).catch(() => ({ root: false, pushed: false }))
+    if (info.root) {
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.undoCommit")}
+          status="error"
+          message={language.t("shell.git.undoRoot.description")}
+        />
+      ))
+      return
+    }
+    dialog.show(() => (
+      <DialogConfirm
+        title={language.t("shell.git.undoCommitConfirm.title")}
+        description={
+          info.pushed
+            ? language.t("shell.git.undoCommitConfirm.pushed")
+            : language.t("shell.git.undoCommitConfirm.description")
+        }
+        confirmLabel={language.t("shell.git.undoCommit")}
+        onConfirm={() =>
+          runAction(
+            "undoCommit",
+            language.t("shell.git.undoCommit"),
+            language.t("shell.git.undoCommitSuccess"),
+            () => gitActions.undoCommit(directory),
+          )
+        }
+      />
+    ))
   }
 
   const commitAndPush = () => {
@@ -319,6 +500,24 @@ function CommitSection(props: {
   const hasContent = () => Boolean(props.directory && props.message.trim() && totalCount() > 0)
   const canCommit = () => hasContent() && !busy()
 
+  const abortMerge = () => {
+    const directory = props.directory
+    if (!directory) return
+    setPending("abort")
+    dialog.show(() => (
+      <DialogGitRun
+        title={language.t("shell.git.conflict.abort")}
+        runningLabel={language.t("shell.git.merge.aborting")}
+        successLabel={language.t("shell.git.merge.abortSuccess")}
+        onSettled={() => setPending(undefined)}
+        run={async () => {
+          await gitActions.mergeAbort(directory)
+          props.onRefresh()
+        }}
+      />
+    ))
+  }
+
   return (
     <section class="flex flex-col gap-3">
       <Show when={props.conflicts.length > 0 && props.directory}>
@@ -329,31 +528,55 @@ function CommitSection(props: {
           </span>
           <button
             type="button"
-            class="shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-            disabled={busy()}
-            onClick={() => void run(() => gitActions.mergeAbort(props.directory!))}
+            class="shrink-0 rounded-sm px-1.5 py-0.5 text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none disabled:opacity-40"
+            disabled={busy() || pending() === "abort"}
+            onClick={() => abortMerge()}
           >
             {language.t("shell.git.conflict.abort")}
           </button>
         </div>
       </Show>
 
-      <div class="px-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
+      <button
+        type="button"
+        class="flex items-center gap-1 px-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted hover:text-v2-text-text-base focus-visible:outline-none"
+        onClick={() => setChangesOpen((value) => !value)}
+      >
+        <Icon
+          name="outline-chevron-down"
+          size="small"
+          class={`shrink-0 transition-transform ${changesOpen() ? "" : "-rotate-90"}`}
+        />
         {language.t("shell.git.changes")}
+      </button>
+      <div classList={{ hidden: !changesOpen() }}>
+        <StagingChanges
+          directory={props.directory}
+          refresh={props.refresh}
+          revision={props.revision}
+          onCount={setStagedCount}
+          onTotal={setTotalCount}
+          conflicts={props.conflicts}
+          activeFile={props.activeFile}
+          onOpenDiff={props.onOpenDiff}
+        />
       </div>
-      <StagingChanges
-        directory={props.directory}
-        refresh={props.refresh}
-        revision={props.revision}
-        onCount={setStagedCount}
-        onTotal={setTotalCount}
-        conflicts={props.conflicts}
-        activeFile={props.activeFile}
-        onOpenDiff={props.onOpenDiff}
-      />
 
-      <div class="px-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
-        {language.t("shell.git.commit")}
+      <div class="flex items-center justify-between px-1">
+        <span class="text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
+          {language.t("shell.git.commit")}
+        </span>
+        <button
+          type="button"
+          class="flex size-6 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          title={language.t("shell.git.generate.tooltip")}
+          disabled={generating() || busy() || !props.directory}
+          onClick={() => void generateMessage()}
+        >
+          <Show when={generating()} fallback={<Icon name="robot" size="small" />}>
+            <Spinner />
+          </Show>
+        </button>
       </div>
       <textarea
         class="h-24 w-full resize-none rounded-md border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base px-2 py-1.5 text-[13px] leading-5 text-v2-text-text-base placeholder:text-v2-text-text-faint focus-visible:border-v2-border-border-focus focus-visible:outline-none disabled:opacity-60"
@@ -393,12 +616,7 @@ function CommitSection(props: {
           label={language.t("shell.git.push")}
           loading={pending() === "push"}
           disabled={busy() || !props.directory}
-          onClick={() =>
-            props.directory &&
-            runAction("push", language.t("shell.git.push"), language.t("shell.git.pushSuccess"), () =>
-              gitActions.push(props.directory!),
-            )
-          }
+          onClick={() => void pushWithRecovery()}
         />
         <GitButton
           icon="branch"
@@ -438,15 +656,7 @@ function CommitSection(props: {
             label={language.t("shell.git.conflict.abort")}
             loading={pending() === "abort"}
             disabled={busy() || !props.directory}
-            onClick={() =>
-              props.directory &&
-              runAction(
-                "abort",
-                language.t("shell.git.conflict.abort"),
-                language.t("shell.git.merge.abortSuccess"),
-                () => gitActions.mergeAbort(props.directory!),
-              )
-            }
+            onClick={() => abortMerge()}
           />
         </Show>
         <GitButton
@@ -454,23 +664,7 @@ function CommitSection(props: {
           label={language.t("shell.git.undoCommit")}
           loading={pending() === "undoCommit"}
           disabled={busy() || !props.directory}
-          onClick={() =>
-            dialog.show(() => (
-              <DialogConfirm
-                title={language.t("shell.git.undoCommitConfirm.title")}
-                description={language.t("shell.git.undoCommitConfirm.description")}
-                confirmLabel={language.t("shell.git.undoCommit")}
-                onConfirm={() =>
-                  runAction(
-                    "undoCommit",
-                    language.t("shell.git.undoCommit"),
-                    language.t("shell.git.undoCommitSuccess"),
-                    () => gitActions.undoCommit(props.directory!),
-                  )
-                }
-              />
-            ))
-          }
+          onClick={() => void requestUndoCommit()}
         />
       </div>
       <div class="mt-1 flex items-center gap-1.5 px-1 text-[11px] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">

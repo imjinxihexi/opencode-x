@@ -137,6 +137,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M13.5554 10.4445V13.5556C13.5554 13.5556 12.7599 13.5556 11.7777 13.5556H4.22211C3.23989 13.5556 2.44434 13.5556 2.44434 13.5556V10.4445M4.88878 5.55557L7.99989 2.44446L11.111 5.55557M7.99989 2.44446L7.99989 9.11112" stroke="currentColor"/>`,
   },
+  robot: {
+    viewBox: "0 0 16 16",
+    body: `<rect x="3.25" y="4.75" width="9.5" height="8" rx="1.75" stroke="currentColor"/><path d="M8 4.75V2.85" stroke="currentColor"/><circle cx="8" cy="2" r="0.9" fill="currentColor"/><circle cx="6.1" cy="7.7" r="0.9" fill="currentColor"/><circle cx="9.9" cy="7.7" r="0.9" fill="currentColor"/><path d="M6.4 10.5H9.6" stroke="currentColor"/>`,
+  },
   reset: {
     viewBox: "0 0 20 20",
     body: `<path d="M5.83333 4.16406L2.5 7.4974L5.83333 10.8307M3.33333 7.4974H17.9167V15.4141H10" stroke="currentColor" stroke-linecap="square"/>`,

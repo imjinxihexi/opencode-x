@@ -1,9 +1,10 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal } from "solid-js"
 import { Icon } from "@opencode-ai/ui/v2/icon"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { Spinner } from "@/components/shell/spinner"
 import { gitActions, type GitFileStatus } from "@/components/shell/git-actions"
 import { useLanguage } from "@/context/language"
-import { showToast } from "@/utils/toast"
 
 type Tone = "add" | "del" | "mod"
 type StageItem = { file: string; letter: string; tone: Tone }
@@ -138,6 +139,7 @@ export function StagingChanges(props: {
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
 }) {
   const language = useLanguage()
+  const dialog = useDialog()
   const [busy, setBusy] = createSignal(false)
   const [pending, setPending] = createSignal<string>()
   const [rev, setRev] = createSignal(0)
@@ -164,11 +166,13 @@ export function StagingChanges(props: {
       await run()
       setRev((value) => value + 1)
     } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.actionFailed")}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
     } finally {
       setBusy(false)
       setPending(undefined)

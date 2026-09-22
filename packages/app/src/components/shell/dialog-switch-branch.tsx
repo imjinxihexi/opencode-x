@@ -7,18 +7,18 @@ import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { createStore } from "solid-js/store"
 import { DialogDirtySwitch } from "@/components/shell/dialog-dirty-switch"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
+import { DialogGitRun } from "@/components/shell/dialog-git-run"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
 import { Persist, persisted } from "@/utils/persist"
-import { showToast } from "@/utils/toast"
 
 export function DialogSwitchBranch(props: { directory: string; onSwitched: () => void }) {
   const language = useLanguage()
   const dialog = useDialog()
   const [query, setQuery] = createSignal("")
   const [open, setOpen] = createSignal(false)
-  const [busy, setBusy] = createSignal(false)
   const [fetching, setFetching] = createSignal(false)
   const [tick, setTick] = createSignal(0)
   let wrap: HTMLDivElement | undefined
@@ -83,22 +83,26 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
     onCleanup(() => document.removeEventListener("mousedown", onDown))
   })
 
-  const checkout = async (branch: string, stashFirst: boolean) => {
-    setBusy(true)
-    try {
-      if (stashFirst) await gitActions.stash(props.directory)
-      await gitActions.switchBranch(props.directory, branch)
-      props.onSwitched()
-      dialog.close()
-    } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
-    } finally {
-      setBusy(false)
-    }
+  const checkout = (branch: string, stashFirst: boolean) => {
+    dialog.show(() => (
+      <DialogGitRun
+        title={language.t("shell.git.switch.title", { repo: getFilename(props.directory) })}
+        runningLabel={language.t("shell.git.switch.switching")}
+        successLabel={language.t("shell.git.switch.success")}
+        run={async () => {
+          try {
+            if (stashFirst) await gitActions.stash(props.directory)
+            await gitActions.switchBranch(props.directory, branch)
+            const actual = await gitActions.currentBranch(props.directory).catch(() => "")
+            if (actual && actual !== branch) {
+              throw new Error(language.t("shell.git.switch.verifyFailed", { branch, actual }))
+            }
+          } finally {
+            props.onSwitched()
+          }
+        }}
+      />
+    ))
   }
 
   const switchTo = async (branch: GitBranch) => {
@@ -130,11 +134,13 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
       await gitActions.fetch(props.directory)
       setTick((value) => value + 1)
     } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.actionFailed")}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
     } finally {
       setFetching(false)
     }

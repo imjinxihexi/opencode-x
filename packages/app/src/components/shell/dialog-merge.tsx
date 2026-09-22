@@ -8,7 +8,6 @@ import { DialogGitRun } from "@/components/shell/dialog-git-run"
 import { gitActions, type GitBranch } from "@/components/shell/git-actions"
 import { Spinner } from "@/components/shell/spinner"
 import { useLanguage } from "@/context/language"
-import { showToast } from "@/utils/toast"
 
 export function DialogMerge(props: { directory: string; onMerged: () => void }) {
   const language = useLanguage()

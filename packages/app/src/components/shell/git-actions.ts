@@ -8,10 +8,11 @@ type GitBridge = {
   gitSwitchBranch?: (cwd: string, branch: string) => Promise<void>
   gitCreateBranch?: (cwd: string, name: string, startPoint?: string) => Promise<void>
   gitFetch?: (cwd: string) => Promise<string>
-  gitPull?: (cwd: string) => Promise<string>
-  gitDeleteBranch?: (cwd: string, name: string) => Promise<void>
+  gitPull?: (cwd: string) => Promise<{ conflicted: boolean; output: string }>
+  gitDeleteBranch?: (cwd: string, name: string, force?: boolean) => Promise<void>
   gitCommit?: (cwd: string, message: string) => Promise<string>
   gitPush?: (cwd: string) => Promise<string>
+  gitPushForce?: (cwd: string) => Promise<string>
   gitDiscard?: (cwd: string) => Promise<void>
   gitMerge?: (cwd: string, branch: string) => Promise<{ conflicted: boolean }>
   gitMergePreview?: (cwd: string, source: string, target: string) => Promise<{ commits: number; conflicts: boolean }>
@@ -32,7 +33,12 @@ type GitBridge = {
   gitStagedFileDiff?: (cwd: string, file: string) => Promise<string>
   gitApplyCached?: (cwd: string, text: string, reverse: boolean) => Promise<void>
   gitUndoCommit?: (cwd: string) => Promise<void>
+  gitUndoCommitInfo?: (cwd: string) => Promise<{ root: boolean; pushed: boolean }>
   gitStash?: (cwd: string) => Promise<void>
+  gitStashList?: (cwd: string) => Promise<{ ref: string; message: string }[]>
+  gitStashApply?: (cwd: string, ref: string) => Promise<void>
+  gitStashPop?: (cwd: string, ref: string) => Promise<void>
+  gitStashDrop?: (cwd: string, ref: string) => Promise<void>
   gitClone?: (url: string, workspace: string, name: string, branch?: string) => Promise<string>
   gitRemoteBranches?: (cwd: string) => Promise<string[]>
 }
@@ -51,10 +57,13 @@ export const gitActions = {
   createBranch: (cwd: string, name: string, startPoint?: string) =>
     bridge()?.gitCreateBranch?.(cwd, name, startPoint) ?? Promise.resolve(),
   fetch: (cwd: string) => bridge()?.gitFetch?.(cwd) ?? Promise.resolve(""),
-  pull: (cwd: string) => bridge()?.gitPull?.(cwd) ?? Promise.resolve(""),
-  deleteBranch: (cwd: string, name: string) => bridge()?.gitDeleteBranch?.(cwd, name) ?? Promise.resolve(),
+  pull: (cwd: string) =>
+    bridge()?.gitPull?.(cwd) ?? Promise.resolve({ conflicted: false, output: "" }),
+  deleteBranch: (cwd: string, name: string, force?: boolean) =>
+    bridge()?.gitDeleteBranch?.(cwd, name, force) ?? Promise.resolve(),
   commit: (cwd: string, message: string) => bridge()?.gitCommit?.(cwd, message) ?? Promise.resolve(""),
   push: (cwd: string) => bridge()?.gitPush?.(cwd) ?? Promise.resolve(""),
+  pushForce: (cwd: string) => bridge()?.gitPushForce?.(cwd) ?? Promise.resolve(""),
   discard: (cwd: string) => bridge()?.gitDiscard?.(cwd) ?? Promise.resolve(),
   merge: (cwd: string, branch: string) =>
     bridge()?.gitMerge?.(cwd, branch) ?? Promise.resolve({ conflicted: false }),
@@ -89,7 +98,13 @@ export const gitActions = {
   applyCached: (cwd: string, text: string, reverse: boolean) =>
     bridge()?.gitApplyCached?.(cwd, text, reverse) ?? Promise.resolve(),
   undoCommit: (cwd: string) => bridge()?.gitUndoCommit?.(cwd) ?? Promise.resolve(),
+  undoCommitInfo: (cwd: string) =>
+    bridge()?.gitUndoCommitInfo?.(cwd) ?? Promise.resolve({ root: false, pushed: false }),
   stash: (cwd: string) => bridge()?.gitStash?.(cwd) ?? Promise.resolve(),
+  stashList: (cwd: string) => bridge()?.gitStashList?.(cwd) ?? Promise.resolve([] as { ref: string; message: string }[]),
+  stashApply: (cwd: string, ref: string) => bridge()?.gitStashApply?.(cwd, ref) ?? Promise.resolve(),
+  stashPop: (cwd: string, ref: string) => bridge()?.gitStashPop?.(cwd, ref) ?? Promise.resolve(),
+  stashDrop: (cwd: string, ref: string) => bridge()?.gitStashDrop?.(cwd, ref) ?? Promise.resolve(),
   clone: (url: string, workspace: string, name: string, branch?: string) =>
     bridge()?.gitClone?.(url, workspace, name, branch) ?? Promise.resolve(""),
   remoteBranches: (cwd: string) => bridge()?.gitRemoteBranches?.(cwd) ?? Promise.resolve([] as string[]),

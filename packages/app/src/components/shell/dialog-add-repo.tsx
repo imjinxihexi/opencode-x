@@ -4,10 +4,10 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@op
 import { Field } from "@opencode-ai/ui/v2/field-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { gitActions } from "@/components/shell/git-actions"
 import type { WorkspaceRepo } from "@/components/shell/workspaces"
 import { useLanguage } from "@/context/language"
-import { showToast } from "@/utils/toast"
 
 function nameFromUrl(url: string) {
   const cleaned = url.trim().replace(/\.git$/, "").replace(/\/+$/, "")
@@ -34,11 +34,13 @@ export function DialogAddRepo(props: { workspaceName: string; onAdded: (repo: Wo
       props.onAdded({ directory, name: repoName, remote, branch: branch().trim() || undefined })
       dialog.close()
     } catch (error) {
-      showToast({
-        variant: "error",
-        title: language.t("shell.git.actionFailed"),
-        description: error instanceof Error ? error.message : String(error),
-      })
+      dialog.show(() => (
+        <DialogGitResult
+          title={language.t("shell.git.actionFailed")}
+          status="error"
+          message={error instanceof Error ? error.message : String(error)}
+        />
+      ))
     } finally {
       setBusy(false)
     }
