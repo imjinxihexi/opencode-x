@@ -791,6 +791,7 @@ export const dict = {
   "shell.git.merge.pickSource": "Select a branch",
   "shell.git.merge.confirm": "Confirm",
   "shell.git.merge.success": "Merged",
+  "shell.git.merge.running": "Merging…",
   "shell.git.merge.abortSuccess": "Merge aborted",
   "shell.git.merge.dirty": "The working tree has uncommitted changes. Commit or stash them first.",
   "shell.git.merge.checkoutFailed": "Failed to switch to the target branch. Merge aborted.",

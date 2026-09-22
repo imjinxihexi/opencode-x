@@ -856,6 +856,7 @@ export const dict = {
   "shell.git.merge.pickSource": "选择分支",
   "shell.git.merge.confirm": "确认",
   "shell.git.merge.success": "合并成功",
+  "shell.git.merge.running": "正在合并…",
   "shell.git.merge.abortSuccess": "已放弃合并",
   "shell.git.merge.dirty": "工作区有未提交改动，请先提交或暂存",
   "shell.git.merge.checkoutFailed": "切换目标分支失败，已中止合并",

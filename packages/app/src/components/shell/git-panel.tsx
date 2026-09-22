@@ -387,7 +387,7 @@ function CommitSection(props: {
           {language.t("shell.git.commitAndPush")}
         </button>
       </Show>
-      <div class="grid grid-cols-2 gap-1">
+      <div class="flex flex-wrap gap-1 [&>button]:grow [&>button]:basis-[90px]">
         <GitButton
           icon="outline-share"
           label={language.t("shell.git.push")}

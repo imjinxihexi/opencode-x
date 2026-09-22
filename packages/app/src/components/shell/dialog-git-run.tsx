@@ -7,8 +7,9 @@ import { useLanguage } from "@/context/language"
 
 export function DialogGitRun(props: {
   title: string
+  runningLabel?: string
   successLabel?: string
-  run: () => Promise<void>
+  run: () => Promise<unknown>
   onSettled?: () => void
 }) {
   const language = useLanguage()
@@ -20,7 +21,11 @@ export function DialogGitRun(props: {
     void props
       .run()
       .then(
-        () => {
+        (result) => {
+          if (result === "conflict") {
+            dialog.close()
+            return
+          }
           setStatus("done")
           setTimeout(() => dialog.close(), 600)
         },
@@ -34,7 +39,7 @@ export function DialogGitRun(props: {
 
   const label = () =>
     status() === "running"
-      ? language.t("shell.git.running")
+      ? (props.runningLabel ?? language.t("shell.git.running"))
       : status() === "done"
         ? (props.successLabel ?? language.t("shell.git.commitSuccess"))
         : language.t("shell.git.actionFailed")

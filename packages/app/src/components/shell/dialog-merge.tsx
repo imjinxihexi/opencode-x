@@ -42,13 +42,15 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
     dialog.show(() => (
       <DialogGitRun
         title={language.t("shell.git.merge.title")}
+        runningLabel={language.t("shell.git.merge.running")}
         successLabel={language.t("shell.git.merge.success")}
         run={async () => {
           if (await gitActions.hasChanges(props.directory)) throw new Error(language.t("shell.git.merge.dirty"))
           const verified = await gitActions.currentBranch(props.directory)
           if (verified !== target) throw new Error(language.t("shell.git.merge.checkoutFailed"))
-          await gitActions.merge(props.directory, from)
+          const result = await gitActions.merge(props.directory, from)
           props.onMerged()
+          return result?.conflicted ? "conflict" : undefined
         }}
       />
     ))
@@ -66,7 +68,8 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
         <Field>
           <Field.Label>{language.t("shell.git.merge.source")}</Field.Label>
           <SelectV2
-            class="!w-full [&_[data-component=select-v2]]:!w-full"
+            class="!w-full"
+            sameWidth
             options={options()}
             current={source()}
             placeholder={language.t("shell.git.merge.pickSource")}
@@ -79,7 +82,7 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
         </Field>
         <Field>
           <Field.Label>{language.t("shell.git.merge.target")}</Field.Label>
-          <div class="flex h-9 w-full items-center justify-between rounded-md border-[0.5px] border-v2-border-border-base bg-v2-background-bg-layer-02 px-3 text-[13px] text-v2-text-text-base">
+          <div class="flex h-9 w-full items-center justify-between rounded-md bg-v2-background-bg-layer-02 px-3 text-[13px] text-v2-text-text-base">
             <span class="min-w-0 truncate">{current() ?? "—"}</span>
             <span class="shrink-0 rounded-[3px] border-[0.5px] border-v2-border-border-base px-1 text-[10px] text-v2-text-text-muted">
               {language.t("shell.git.switch.current")}

@@ -52,6 +52,7 @@ import {
   stagedFileDiff as gitStagedFileDiff,
   stash as gitStash,
   statusRaw as gitStatusRaw,
+  switchBranch as gitSwitchBranch,
   undoCommit as gitUndoCommit,
   unstageAll as gitUnstageAll,
   unstageFile as gitUnstageFile,
@@ -98,6 +99,9 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("kill-sidecar", () => deps.killSidecar())
   ipcMain.handle("git-branches", (_event: IpcMainInvokeEvent, cwd: string) => gitBranches(cwd))
   ipcMain.handle("git-checkout", (_event: IpcMainInvokeEvent, cwd: string, branch: string) => gitCheckout(cwd, branch))
+  ipcMain.handle("git-switch-branch", (_event: IpcMainInvokeEvent, cwd: string, branch: string) =>
+    gitSwitchBranch(cwd, branch),
+  )
   ipcMain.handle("git-create-branch", (_event: IpcMainInvokeEvent, cwd: string, name: string, startPoint?: string) =>
     gitCreateBranch(cwd, name, startPoint),
   )

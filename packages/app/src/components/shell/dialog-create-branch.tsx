@@ -88,7 +88,7 @@ export function DialogCreateBranch(props: { directory: string; onCreated: () => 
         <Field>
           <Field.Label>{language.t("shell.git.newBranch.source")}</Field.Label>
           <SelectV2
-            class="!w-full [&_[data-component=select-v2]]:!w-full"
+            class="!w-full"
             options={names()}
             current={selectedSource()}
             value={(value) => value}

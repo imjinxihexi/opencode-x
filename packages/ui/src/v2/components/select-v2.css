@@ -9,7 +9,7 @@
 [data-component="menu-v2-content"][data-slot="select-v2-content"] {
   padding: 0;
   min-width: 160px;
-  max-width: 23rem;
+  max-width: none;
   overflow: hidden;
   z-index: 60;
   pointer-events: auto;
@@ -294,4 +294,9 @@
   [data-slot="menu-v2-item-indicator"]
   svg {
   visibility: hidden;
+}
+
+[data-component="field-v2"] > [data-component="select-v2-root"] {
+  width: 100%;
+  min-width: 0;
 }

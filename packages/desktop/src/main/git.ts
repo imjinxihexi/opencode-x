@@ -73,6 +73,15 @@ export async function checkout(cwd: string, branch: string) {
   await run(cwd, ["checkout", branch])
 }
 
+export async function switchBranch(cwd: string, branch: string) {
+  await run(cwd, ["checkout", branch])
+  try {
+    await run(cwd, ["pull", "--ff-only"])
+  } catch {
+    // no upstream, detached, or not fast-forwardable: keep local branch as-is
+  }
+}
+
 export async function createBranch(cwd: string, name: string, startPoint?: string) {
   await run(cwd, startPoint ? ["checkout", "-b", name, startPoint] : ["checkout", "-b", name])
 }
@@ -118,7 +127,13 @@ export async function discard(cwd: string) {
 }
 
 export async function merge(cwd: string, branch: string) {
-  return run(cwd, ["merge", branch])
+  return execFileAsync("git", ["merge", branch], { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }).then(
+    () => ({ conflicted: false }),
+    (error: { code?: number }) => {
+      if (error?.code === 1) return { conflicted: true }
+      throw error
+    },
+  )
 }
 
 export async function mergePreview(cwd: string, source: string, target: string) {

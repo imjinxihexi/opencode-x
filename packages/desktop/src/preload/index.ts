@@ -104,6 +104,7 @@ const api: ElectronAPI = {
   readClipboardImage: () => ipcRenderer.invoke("read-clipboard-image"),
   gitBranches: (cwd) => ipcRenderer.invoke("git-branches", cwd),
   gitCheckout: (cwd, branch) => ipcRenderer.invoke("git-checkout", cwd, branch),
+  gitSwitchBranch: (cwd, branch) => ipcRenderer.invoke("git-switch-branch", cwd, branch),
   gitCreateBranch: (cwd, name, startPoint) => ipcRenderer.invoke("git-create-branch", cwd, name, startPoint),
   gitFetch: (cwd) => ipcRenderer.invoke("git-fetch", cwd),
   gitPull: (cwd) => ipcRenderer.invoke("git-pull", cwd),

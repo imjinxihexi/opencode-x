@@ -87,7 +87,7 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
     setBusy(true)
     try {
       if (stashFirst) await gitActions.stash(props.directory)
-      await gitActions.checkout(props.directory, branch)
+      await gitActions.switchBranch(props.directory, branch)
       props.onSwitched()
       dialog.close()
     } catch (error) {

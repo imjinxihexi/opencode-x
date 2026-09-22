@@ -5,6 +5,7 @@ export type GitFileStatus = { file: string; index: string; worktree: string; unt
 type GitBridge = {
   gitBranches?: (cwd: string) => Promise<GitBranch[]>
   gitCheckout?: (cwd: string, branch: string) => Promise<void>
+  gitSwitchBranch?: (cwd: string, branch: string) => Promise<void>
   gitCreateBranch?: (cwd: string, name: string, startPoint?: string) => Promise<void>
   gitFetch?: (cwd: string) => Promise<string>
   gitPull?: (cwd: string) => Promise<string>
@@ -12,7 +13,7 @@ type GitBridge = {
   gitCommit?: (cwd: string, message: string) => Promise<string>
   gitPush?: (cwd: string) => Promise<string>
   gitDiscard?: (cwd: string) => Promise<void>
-  gitMerge?: (cwd: string, branch: string) => Promise<string>
+  gitMerge?: (cwd: string, branch: string) => Promise<{ conflicted: boolean }>
   gitMergePreview?: (cwd: string, source: string, target: string) => Promise<{ commits: number; conflicts: boolean }>
   gitCurrentBranch?: (cwd: string) => Promise<string>
   gitHasChanges?: (cwd: string) => Promise<boolean>
@@ -45,6 +46,8 @@ export const gitActions = {
   available: () => Boolean(bridge()?.gitBranches),
   branches: (cwd: string) => bridge()?.gitBranches?.(cwd) ?? Promise.resolve([] as GitBranch[]),
   checkout: (cwd: string, branch: string) => bridge()?.gitCheckout?.(cwd, branch) ?? Promise.resolve(),
+  switchBranch: (cwd: string, branch: string) =>
+    bridge()?.gitSwitchBranch?.(cwd, branch) ?? bridge()?.gitCheckout?.(cwd, branch) ?? Promise.resolve(),
   createBranch: (cwd: string, name: string, startPoint?: string) =>
     bridge()?.gitCreateBranch?.(cwd, name, startPoint) ?? Promise.resolve(),
   fetch: (cwd: string) => bridge()?.gitFetch?.(cwd) ?? Promise.resolve(""),
@@ -53,7 +56,8 @@ export const gitActions = {
   commit: (cwd: string, message: string) => bridge()?.gitCommit?.(cwd, message) ?? Promise.resolve(""),
   push: (cwd: string) => bridge()?.gitPush?.(cwd) ?? Promise.resolve(""),
   discard: (cwd: string) => bridge()?.gitDiscard?.(cwd) ?? Promise.resolve(),
-  merge: (cwd: string, branch: string) => bridge()?.gitMerge?.(cwd, branch) ?? Promise.resolve(""),
+  merge: (cwd: string, branch: string) =>
+    bridge()?.gitMerge?.(cwd, branch) ?? Promise.resolve({ conflicted: false }),
   mergePreview: (cwd: string, source: string, target: string) =>
     bridge()?.gitMergePreview?.(cwd, source, target) ?? Promise.resolve({ commits: 0, conflicts: false }),
   currentBranch: (cwd: string) => bridge()?.gitCurrentBranch?.(cwd) ?? Promise.resolve(""),
