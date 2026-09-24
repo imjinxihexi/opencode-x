@@ -150,11 +150,20 @@ export function StagingChanges(props: {
 
   const [status] = createResource(
     () => [props.directory, props.refresh, props.revision, rev()] as const,
-    async ([directory]) => (directory ? gitActions.status(directory).catch(() => [] as GitFileStatus[]) : []),
+    async ([directory]) => ({
+      directory: directory ?? "",
+      items: directory ? await gitActions.status(directory).catch(() => [] as GitFileStatus[]) : [],
+    }),
   )
 
-  const staged = createMemo(() => toItems(status() ?? [], "index"))
-  const unstaged = createMemo(() => toItems(status() ?? [], "worktree"))
+  const items = createMemo(() => {
+    const value = status()
+    if (!value || value.directory !== (props.directory ?? "")) return [] as GitFileStatus[]
+    return value.items
+  })
+
+  const staged = createMemo(() => toItems(items(), "index"))
+  const unstaged = createMemo(() => toItems(items(), "worktree"))
 
   createEffect(() => props.onCount?.(staged().length))
   createEffect(() => props.onTotal?.(staged().length + unstaged().length))

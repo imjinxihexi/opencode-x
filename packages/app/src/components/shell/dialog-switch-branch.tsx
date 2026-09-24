@@ -229,7 +229,7 @@ export function DialogSwitchBranch(props: { directory: string; onSwitched: () =>
       <DialogHeader>
         <DialogTitle>{language.t("shell.git.switch.title", { repo: getFilename(props.directory) })}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="flex w-full flex-col gap-3 px-4 pt-4 pb-4">
+      <DialogBody class="flex w-full flex-col gap-3 px-4 pt-2 pb-4">
         <Field>
           <Field.Label>{language.t("shell.git.switch.target")}</Field.Label>
           <div class="relative w-full" ref={(element) => (wrap = element)}>

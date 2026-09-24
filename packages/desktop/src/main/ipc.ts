@@ -29,6 +29,8 @@ import {
   branches as gitBranches,
   checkout as gitCheckout,
   clone as gitClone,
+  createWorkspaceDir as gitCreateWorkspaceDir,
+  readWorkspaceMeta as gitReadWorkspaceMeta,
   commit as gitCommit,
   conflictSides as gitConflictSides,
   conflicts as gitConflicts,
@@ -47,6 +49,7 @@ import {
   push as gitPush,
   pushForce as gitPushForce,
   remoteBranches as gitRemoteBranches,
+  lsRemoteBranches as gitLsRemoteBranches,
   resolveConflict as gitResolveConflict,
   stageAll as gitStageAll,
   stageFile as gitStageFile,
@@ -137,7 +140,9 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("git-write-resolved", (_event: IpcMainInvokeEvent, cwd: string, file: string, content: string) =>
     gitWriteResolved(cwd, file, content),
   )
-  ipcMain.handle("git-log", (_event: IpcMainInvokeEvent, cwd: string, limit?: number) => gitLog(cwd, limit))
+  ipcMain.handle("git-log", (_event: IpcMainInvokeEvent, cwd: string, limit?: number, skip?: number) =>
+    gitLog(cwd, limit, skip),
+  )
   ipcMain.handle("git-file-diff", (_event: IpcMainInvokeEvent, cwd: string, file: string) => gitFileDiff(cwd, file))
   ipcMain.handle("git-status-raw", (_event: IpcMainInvokeEvent, cwd: string) => gitStatusRaw(cwd))
   ipcMain.handle("git-stage-file", (_event: IpcMainInvokeEvent, cwd: string, file: string) => gitStageFile(cwd, file))
@@ -159,10 +164,26 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("git-stash-apply", (_event: IpcMainInvokeEvent, cwd: string, ref: string) => gitStashApply(cwd, ref))
   ipcMain.handle("git-stash-pop", (_event: IpcMainInvokeEvent, cwd: string, ref: string) => gitStashPop(cwd, ref))
   ipcMain.handle("git-stash-drop", (_event: IpcMainInvokeEvent, cwd: string, ref: string) => gitStashDrop(cwd, ref))
-  ipcMain.handle("git-clone", (_event: IpcMainInvokeEvent, url: string, workspace: string, name: string, branch?: string) =>
-    gitClone(url, workspace, name, branch),
+  ipcMain.handle(
+    "git-clone",
+    (
+      _event: IpcMainInvokeEvent,
+      url: string,
+      workspace: string,
+      name: string,
+      branch?: string,
+      root?: string,
+      folder?: string,
+    ) => gitClone(url, workspace, name, branch, root, folder),
   )
+  ipcMain.handle(
+    "git-create-workspace-dir",
+    (_event: IpcMainInvokeEvent, root?: string, folder?: string, meta?: unknown) =>
+      gitCreateWorkspaceDir(root, folder ?? "", meta),
+  )
+  ipcMain.handle("git-read-workspace-meta", (_event: IpcMainInvokeEvent, path: string) => gitReadWorkspaceMeta(path))
   ipcMain.handle("git-remote-branches", (_event: IpcMainInvokeEvent, cwd: string) => gitRemoteBranches(cwd))
+  ipcMain.handle("git-ls-remote-branches", (_event: IpcMainInvokeEvent, url: string) => gitLsRemoteBranches(url))
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
   ipcMain.handle("consume-initial-deep-links", () => deps.consumeInitialDeepLinks())
   ipcMain.handle("get-default-server-url", () => deps.getDefaultServerUrl())

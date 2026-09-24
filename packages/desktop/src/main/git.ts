@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process"
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { join, isAbsolute } from "node:path"
 import { promisify } from "node:util"
 
 const execFileAsync = promisify(execFile)
@@ -67,6 +67,33 @@ export async function remoteBranches(cwd: string): Promise<string[]> {
     .map((line) => line.trim())
     .filter(Boolean)
     .filter((name) => !name.endsWith("/HEAD"))
+}
+
+export async function lsRemoteBranches(url: string): Promise<string[]> {
+  const result = await execFileAsync("git", ["ls-remote", "--symref", "--heads", url], {
+    windowsHide: true,
+    maxBuffer: 10 * 1024 * 1024,
+    timeout: 20000,
+  })
+  let defaultBranch: string | undefined
+  const branches: string[] = []
+  for (const line of result.stdout.split("\n")) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    const separator = trimmed.indexOf("\t")
+    const ref = (separator === -1 ? trimmed : trimmed.slice(0, separator)).trim()
+    const name = separator === -1 ? "" : trimmed.slice(separator + 1).trim()
+    if (!name) continue
+    if (ref.startsWith("ref: refs/heads/")) {
+      defaultBranch = ref.slice("ref: refs/heads/".length)
+      continue
+    }
+    if (name.startsWith("refs/heads/")) branches.push(name.slice("refs/heads/".length))
+  }
+  const sorted = defaultBranch
+    ? [defaultBranch, ...branches.filter((branch) => branch !== defaultBranch)]
+    : branches
+  return [...new Set(sorted)]
 }
 
 export async function checkout(cwd: string, branch: string) {
@@ -231,8 +258,8 @@ export async function mergeAbort(cwd: string) {
   await run(cwd, ["merge", "--abort"])
 }
 
-export async function log(cwd: string, limit = 20): Promise<GitCommit[]> {
-  const output = await run(cwd, ["log", `-n${limit}`, "--pretty=format:%h%x1f%an%x1f%ar%x1f%s"])
+export async function log(cwd: string, limit = 20, skip = 0): Promise<GitCommit[]> {
+  const output = await run(cwd, ["log", `--skip=${skip}`, `-n${limit}`, "--pretty=format:%h%x1f%an%x1f%ar%x1f%s"])
   return output
     .split("\n")
     .filter(Boolean)
@@ -315,11 +342,48 @@ export function workspaceRoot(workspace: string, name: string) {
   return join(homedir(), "opencode-workspaces", safe(workspace), safe(name))
 }
 
-export async function clone(url: string, workspace: string, name: string, branch?: string) {
-  const dest = workspaceRoot(workspace, name)
-  await mkdir(join(homedir(), "opencode-workspaces", workspace.replace(/[^a-zA-Z0-9._-]/g, "-")), {
-    recursive: true,
-  })
+export function safeFolderName(value: string) {
+  let out = value.normalize("NFKC").replace(/[^a-zA-Z0-9._-]+/g, "-")
+  out = out.replace(/-{2,}/g, "-").replace(/^[.\-]+/, "").replace(/[.\- ]+$/, "")
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(out)) out = `ws-${out}`
+  if (out.length > 64) out = out.slice(0, 64).replace(/[.\- ]+$/, "")
+  return out || "workspace"
+}
+
+function workspaceBase(root?: string, folder?: string) {
+  if (folder) {
+    const safe = safeFolderName(folder)
+    return root ? join(root, safe) : join(homedir(), "opencode-workspaces", safe)
+  }
+  if (root) return root
+  return join(homedir(), "opencode-workspaces", workspace.replace(/[^a-zA-Z0-9._-]/g, "-") || "workspace")
+}
+
+export async function createWorkspaceDir(root: string | undefined, folder: string, meta?: unknown) {
+  const target = workspaceBase(root, folder || undefined)
+  if (root && !isAbsolute(root)) throw new Error(`Storage location must be an absolute path: ${root}`)
+  await mkdir(target, { recursive: true })
+  if (meta !== undefined) {
+    await writeFile(join(target, "workspace.json"), `${JSON.stringify(meta, null, 2)}\n`, "utf8")
+  }
+  return target
+}
+
+export async function readWorkspaceMeta(path: string) {
+  const raw = await readFile(join(path, "workspace.json"), "utf8").catch(() => undefined)
+  if (raw === undefined) return undefined
+  try {
+    return JSON.parse(raw) as Record<string, unknown>
+  } catch {
+    return undefined
+  }
+}
+
+export async function clone(url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) {
+  const parent = workspaceBase(root, folder)
+  await mkdir(parent, { recursive: true })
+  const safe = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/^-+|-+$/g, "") || "repo"
+  const dest = join(parent, safe(name))
   const args = ["clone"]
   if (branch) args.push("--branch", branch)
   args.push(url, dest)

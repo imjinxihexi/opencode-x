@@ -68,7 +68,7 @@ export function DialogCreateBranch(props: { directory: string; onCreated: () => 
       <DialogHeader>
         <DialogTitle>{language.t("shell.git.newBranch.title")}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="flex w-full flex-col gap-4 px-4 pt-4 pb-1">
+      <DialogBody class="flex w-full flex-col gap-4 px-4 pt-2 pb-1">
         <div class="flex w-full flex-col gap-2">
           <div class="select-none text-[13px] font-[530] leading-none tracking-[-0.04px] text-v2-text-text-base">
             {language.t("shell.git.newBranch.method")}

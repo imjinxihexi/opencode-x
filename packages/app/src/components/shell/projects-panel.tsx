@@ -16,6 +16,7 @@ import { useServerSync } from "@/context/server-sync"
 export function ProjectsPanel(props: {
   selected?: string
   repos: Repo[]
+  scannedRepos: Repo[]
   selectedRepo?: string
   width: number
   minWidth: number
@@ -41,7 +42,7 @@ export function ProjectsPanel(props: {
   const branch = (worktree: string) => sync().child(worktree, { bootstrap: false })[0].vcs?.branch
   const label = (project: { name?: string; worktree: string }) => project.name || getFilename(project.worktree)
   const nested = (project: { worktree: string }) =>
-    props.selected === project.worktree ? props.repos.filter((repo) => repo.directory !== project.worktree) : []
+    props.selected === project.worktree ? props.scannedRepos.filter((repo) => repo.directory !== project.worktree) : []
 
   const pickProject = async () => {
     if (platform.platform !== "desktop") return
@@ -59,21 +60,8 @@ export function ProjectsPanel(props: {
       class="relative h-full shrink-0 flex flex-col border-r-[0.5px] border-v2-border-border-base bg-v2-background-bg-deep"
       style={{ width: `${props.width}px` }}
     >
-      <div class="flex h-10 shrink-0 items-center gap-2 px-3">
-        <Icon name="folder" class="shrink-0 text-v2-icon-icon-muted" />
-        <span class="text-[13px] font-[530] leading-5 text-v2-text-text-base">{language.t("shell.projects.title")}</span>
-        <span class="text-[12px] leading-5 text-v2-text-text-muted">{projects().length}</span>
-        <button
-          type="button"
-          class="ml-auto flex size-6 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-          onClick={() => void pickProject()}
-          title={language.t("shell.projects.open")}
-        >
-          <Icon name="plus" />
-        </button>
-      </div>
       <ScrollView class="flex-1 min-h-0">
-        <div class="flex flex-col gap-2 px-2 pb-3">
+        <div class="flex flex-col gap-2 px-2 pt-3 pb-3">
           <div class="flex items-center gap-2 px-1 pt-1">
             <Icon name="workspace" class="shrink-0 text-v2-icon-icon-muted" />
             <span class="text-[12px] font-[530] leading-5 text-v2-text-text-muted">
@@ -116,36 +104,39 @@ export function ProjectsPanel(props: {
                   </button>
                 </div>
                 <For each={workspace.repos}>
-                  {(repo) => (
-                    <div
-                      class="group flex min-w-0 items-stretch gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-v2-background-bg-layer-02"
-                      classList={{
-                        "bg-v2-overlay-simple-overlay-pressed":
-                          props.selectedWorkspace === workspace.id && props.selectedRepo === repo.directory,
-                      }}
-                      title={repo.directory}
-                    >
-                      <button
-                        type="button"
-                        class="flex min-w-0 flex-1 flex-col items-stretch gap-1 text-left focus-visible:outline-none"
-                        onClick={() => {
-                          props.onSelectWorkspace(workspace.id)
-                          props.onSelectRepo(repo.directory)
+                  {(repo) => {
+                    const live = () => props.repos.find((item) => item.directory === repo.directory)
+                    return (
+                      <div
+                        class="group flex min-w-0 items-stretch gap-1 rounded-md px-2 py-1.5 transition-colors hover:bg-v2-background-bg-layer-02"
+                        classList={{
+                          "bg-v2-overlay-simple-overlay-pressed":
+                            props.selectedWorkspace === workspace.id && props.selectedRepo === repo.directory,
                         }}
+                        title={repo.directory}
                       >
-                        <div class="flex min-w-0 items-center gap-1.5">
-                          <Icon name="folder" size="small" class="shrink-0 text-v2-icon-icon-muted" />
-                          <span class="min-w-0 flex-1 truncate text-[13px] leading-5 text-v2-text-text-base">
-                            {repo.name}
-                          </span>
-                        </div>
-                        <div class="flex min-w-0 items-center gap-1 ps-[22px] text-[11px] leading-4 text-v2-text-text-faint">
-                          <Icon name="branch" size="small" class="shrink-0" />
-                          <span class="min-w-0 truncate">{repo.branch ?? "—"}</span>
-                        </div>
-                      </button>
-                    </div>
-                  )}
+                        <button
+                          type="button"
+                          class="flex min-w-0 flex-1 flex-col items-stretch gap-1 text-left focus-visible:outline-none"
+                          onClick={() => {
+                            props.onSelectWorkspace(workspace.id)
+                            props.onSelectRepo(repo.directory)
+                          }}
+                        >
+                          <div class="flex min-w-0 items-center gap-1.5">
+                            <Icon name="folder" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+                            <span class="min-w-0 flex-1 truncate text-[13px] leading-5 text-v2-text-text-base">
+                              {repo.name}
+                            </span>
+                          </div>
+                          <div class="flex min-w-0 items-center gap-1 ps-[22px] text-[11px] leading-4 text-v2-text-text-faint">
+                            <Icon name="branch" size="small" class="shrink-0" />
+                            <span class="min-w-0 truncate">{live()?.branch ?? repo.branch ?? "—"}</span>
+                          </div>
+                        </button>
+                      </div>
+                    )
+                  }}
                 </For>
               </div>
             )}
@@ -156,6 +147,21 @@ export function ProjectsPanel(props: {
             </div>
           </Show>
 
+          <div class="flex items-center gap-2 px-1 pt-2">
+            <Icon name="folder" class="shrink-0 text-v2-icon-icon-muted" />
+            <span class="text-[12px] font-[530] leading-5 text-v2-text-text-muted">
+              {language.t("shell.projects.title")}
+            </span>
+            <span class="text-[12px] leading-5 text-v2-text-text-muted">{projects().length}</span>
+            <button
+              type="button"
+              class="ml-auto flex size-6 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+              onClick={() => void pickProject()}
+              title={language.t("shell.projects.open")}
+            >
+              <Icon name="plus" />
+            </button>
+          </div>
           <For each={projects()}>
             {(project) => (
               <div class="flex flex-col gap-1 rounded-lg border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base p-2">

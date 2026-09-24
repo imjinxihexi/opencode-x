@@ -31,6 +31,7 @@ export function Dialog(props: DialogProps) {
             ...props.classList,
             [props.class ?? ""]: !!props.class,
           }}
+          onPointerDownOutside={(event) => event.preventDefault()}
           onOpenAutoFocus={(e) => {
             const target = e.currentTarget as HTMLElement | null
             const autofocusEl = target?.querySelector("[autofocus]") as HTMLElement | null

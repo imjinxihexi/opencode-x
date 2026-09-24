@@ -16,7 +16,7 @@ export function DialogConfirm(props: {
       <DialogHeader>
         <DialogTitle>{props.title}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="px-4 pt-3 pb-1 text-[13px] leading-5 text-v2-text-text-muted">{props.description}</DialogBody>
+      <DialogBody class="px-4 pt-2 pb-1 text-[13px] leading-5 text-v2-text-text-muted">{props.description}</DialogBody>
       <DialogFooter>
         <ButtonV2 type="button" variant="neutral" onClick={dialog.close}>
           {language.t("common.cancel")}

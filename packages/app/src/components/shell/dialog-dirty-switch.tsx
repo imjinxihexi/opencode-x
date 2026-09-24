@@ -15,7 +15,7 @@ export function DialogDirtySwitch(props: {
       <DialogHeader>
         <DialogTitle>{language.t("shell.git.dirtySwitch.title")}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="px-4 pt-3 pb-1 text-[13px] leading-5 text-v2-text-text-muted">
+      <DialogBody class="px-4 pt-2 pb-1 text-[13px] leading-5 text-v2-text-text-muted">
         {language.t("shell.git.dirtySwitch.description", { branch: props.branch })}
       </DialogBody>
       <DialogFooter>

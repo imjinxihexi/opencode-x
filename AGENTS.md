@@ -3,6 +3,18 @@
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
 - The default branch in this repo is `dev`.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+- Do NOT run `bun run build` automatically after code changes. The user verifies in their own dev session and asks for a build when they want one.
+
+## Resolving the "current model" (shell-level features)
+
+Any shell-level feature that calls the AI (git panel "AI commit message", workspace identifier generation, …) MUST resolve the model in this exact order. Getting this wrong silently falls back to a stale model from `models.recent` and fails with provider errors.
+
+1. Active tab's prompt model: `tabs.stateValue<PromptSession>(tab, "prompt")?.model.current()` where `tab` comes from `layout.route()` (session → `{ type: "session", server, sessionId }`; draft → find in `tabs.store`). It returns `{ providerID, modelID }` — NOT a catalog model.
+2. Scan ALL tabs in `tabs.store` (newest first) for any tab with a prompt model — needed because the user may trigger generation from the home/workspace-grid route where there is no active session tab.
+3. The session's real model: `client.session.get({ sessionID })` → `model: { id, providerID }`.
+4. `models.recent.list()[0]` (stale — last resort) → first visible model from `models.list()`.
+
+Shared one-shot generation helper: `packages/app/src/components/shell/ai-generate.ts` (`aiGenerateText`) — creates a temp session, `promptAsync`, polls `session.messages` until the assistant text is stable (the synchronous `session.prompt` endpoint streams and cannot be parsed), deletes the temp session, and surfaces assistant `error` fields. Reuse it; do not call `session.prompt` directly.
 
 ## Branch Names
 

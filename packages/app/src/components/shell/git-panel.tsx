@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup, onMount } from "solid-js"
+import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup, onMount } from "solid-js"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
@@ -10,6 +10,7 @@ import { DialogGitRun } from "@/components/shell/dialog-git-run"
 import { DialogMerge } from "@/components/shell/dialog-merge"
 import { GitButton } from "@/components/shell/git-button"
 import { gitActions, type GitCommit, type GitFileStatus } from "@/components/shell/git-actions"
+import { aiGenerateText, resolveCurrentModel } from "@/components/shell/ai-generate"
 import type { Repo } from "@/components/shell/repos"
 import { Spinner } from "@/components/shell/spinner"
 import { StagingChanges } from "@/components/shell/staging-changes"
@@ -37,6 +38,7 @@ export function GitPanel(props: {
   conflicts: string[]
   activeModel?: { providerID: string; modelID: string }
   activeSessionId?: string
+  sessions?: { sessionID: string; directory?: string }[]
 }) {
   const language = useLanguage()
   const sdk = useServerSDK()
@@ -44,6 +46,14 @@ export function GitPanel(props: {
   const [tab, setTab] = createSignal<GitTab>("commit")
   const [message, setMessage] = createSignal("")
   const [revision, setRevision] = createSignal(0)
+
+  createEffect(
+    on(
+      () => props.selectedRepo,
+      () => setMessage(""),
+      { defer: true },
+    ),
+  )
 
   onMount(() => {
     const bump = () => {
@@ -178,6 +188,7 @@ export function GitPanel(props: {
                   onOpenDiff={props.onOpenDiff}
                   activeModel={props.activeModel}
                   activeSessionId={props.activeSessionId}
+                  sessions={props.sessions}
                 />
               }
             >
@@ -236,6 +247,7 @@ function CommitSection(props: {
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
   activeModel?: { providerID: string; modelID: string }
   activeSessionId?: string
+  sessions?: { sessionID: string; directory?: string }[]
 }) {
   const language = useLanguage()
   const dialog = useDialog()
@@ -248,6 +260,10 @@ function CommitSection(props: {
   const [commits, setCommits] = createSignal<GitCommit[]>([])
   const [generating, setGenerating] = createSignal(false)
   const [changesOpen, setChangesOpen] = createSignal(true)
+  const [historyOpen, setHistoryOpen] = createSignal(true)
+  const [loadingMore, setLoadingMore] = createSignal(false)
+  const [hasMore, setHasMore] = createSignal(true)
+  const HISTORY_PAGE = 10
 
   const collectDiff = async (directory: string) => {
     const status = await gitActions.status(directory).catch(() => [] as GitFileStatus[])
@@ -264,8 +280,6 @@ function CommitSection(props: {
     return chunks.join("\n\n")
   }
 
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
   const generateMessage = async () => {
     const directory = props.directory
     if (!directory || generating()) return
@@ -275,88 +289,37 @@ function CommitSection(props: {
       if (!client.session?.promptAsync || !client.session?.create || !client.session?.messages) {
         throw new Error(language.t("shell.git.generate.unsupported"))
       }
-      let key = props.activeModel
-      if (!key && props.activeSessionId) {
-        const info = (await client.session.get({ sessionID: props.activeSessionId }).catch(() => undefined)) as unknown as
-          | { data?: { model?: { id?: string; providerID?: string } }; model?: { id?: string; providerID?: string } }
-          | undefined
-        const sessionModel = info?.data?.model ?? info?.model
-        if (sessionModel?.id && sessionModel.providerID) key = { providerID: sessionModel.providerID, modelID: sessionModel.id }
-      }
-      const recent = models.recent.list()[0]
-      const model =
-        (key ? models.find(key) : undefined) ??
-        (recent ? models.find(recent) : undefined) ??
-        models.list().find((item) => models.visible({ providerID: item.provider.id, modelID: item.id }))
-      if (!model) throw new Error(language.t("shell.git.generate.noModel"))
+      const resolved =
+        (await resolveCurrentModel({
+          client,
+          candidates: [props.activeModel, models.recent.list()[0]],
+          sessions: props.sessions,
+        })) ??
+        (() => {
+          const fallback = models.list().find((item) => models.visible({ providerID: item.provider.id, modelID: item.id }))
+          return fallback ? { model: { providerID: fallback.provider.id, modelID: fallback.id } } : undefined
+        })()
+      if (!resolved) throw new Error(language.t("shell.git.generate.noModel"))
       const diff = await collectDiff(directory)
       if (!diff.trim()) throw new Error(language.t("shell.git.generate.noChanges"))
 
-      const created = (await client.session.create({
+      const zh = language.locale().startsWith("zh")
+      const system = zh
+        ? "你是 Git 提交信息生成助手。根据提供的代码改动生成一条简洁、准确的提交信息。只输出提交信息本身，不要引号、代码块或任何解释。格式为 Conventional Commits：类型前缀（feat、fix、refactor、chore、docs、style、test 等）保留英文，冒号后的描述必须使用简体中文，用祈使语气，首行为简明摘要。例如：\"fix: 修复登录超时问题\"。"
+        : "You are a git commit message generator. Given the provided code changes, write one concise, accurate commit message. Output only the commit message itself, with no quotes, code fences, or explanation. Use Conventional Commits style (feat:, fix:, refactor:, ...), imperative mood, with a short summary line."
+      const text = `${zh ? "根据以下改动生成提交信息：" : "Generate a commit message for the following changes:"}\n\n${diff.slice(0, 12000)}`
+      const message = await aiGenerateText({
+        client,
         directory,
-        model: { id: model.id, providerID: model.provider.id },
-      })) as unknown as { data?: { id?: string }; id?: string }
-      const sessionID = created?.data?.id ?? created?.id
-      if (!sessionID) throw new Error(language.t("shell.git.generate.unsupported"))
-
-      try {
-        const zh = language.locale().startsWith("zh")
-        const system = zh
-          ? "你是 Git 提交信息生成助手。根据提供的代码改动生成一条简洁、准确的提交信息。只输出提交信息本身，不要引号、代码块或任何解释。格式为 Conventional Commits：类型前缀（feat、fix、refactor、chore、docs、style、test 等）保留英文，冒号后的描述必须使用简体中文，用祈使语气，首行为简明摘要。例如：\"fix: 修复登录超时问题\"。"
-          : "You are a git commit message generator. Given the provided code changes, write one concise, accurate commit message. Output only the commit message itself, with no quotes, code fences, or explanation. Use Conventional Commits style (feat:, fix:, refactor:, ...), imperative mood, with a short summary line."
-        const text = `${zh ? "根据以下改动生成提交信息：" : "Generate a commit message for the following changes:"}\n\n${diff.slice(0, 12000)}`
-        await client.session.promptAsync({
-          sessionID,
-          directory,
-          model: { providerID: model.provider.id, modelID: model.id },
-          system,
-          tools: {},
-          parts: [{ type: "text", text }],
-        })
-
-        type Entry = {
-          info?: {
-            role?: string
-            error?: { name?: string; message?: string; data?: { message?: string } }
-          }
-          parts?: Array<{ type?: string; text?: string }>
-        }
-        const deadline = Date.now() + 120000
-        let message = ""
-        let stable = 0
-        while (Date.now() < deadline) {
-          await sleep(600)
-          const res = (await client.session.messages({ sessionID, directory })) as unknown as
-            | { data?: Entry[] }
-            | Entry[]
-          const list = Array.isArray(res) ? res : (res?.data ?? [])
-          const failed = list.find((entry) => entry?.info?.role === "assistant" && entry.info.error)
-          if (failed?.info?.error) {
-            const err = failed.info.error
-            throw new Error(err.data?.message ?? err.message ?? err.name ?? language.t("shell.git.actionFailed"))
-          }
-          const content = list
-            .filter((entry) => entry?.info?.role === "assistant")
-            .flatMap((entry) => entry.parts ?? [])
-            .filter((part) => part?.type === "text" && typeof part.text === "string")
-            .map((part) => part.text!)
-            .join("\n")
-            .trim()
-          if (content) {
-            stable = content === message ? stable + 1 : 0
-            message = content
-            if (stable >= 2) break
-          }
-        }
-        if (!message) throw new Error(language.t("shell.git.generate.empty"))
-        props.setMessage(message)
-      } finally {
-        await client.session.delete({ sessionID, directory }).catch(() => {})
-      }
+        model: { providerID: resolved.model.providerID, modelID: resolved.model.modelID },
+        system,
+        text,
+      })
+      props.setMessage(message)
     } catch (error) {
       dialog.show(() => (
         <DialogGitResult
-          title={language.t("shell.git.generate.title")}
+          title={language.t("shell.ai.generateFailed")}
           status="error"
           message={error instanceof Error ? error.message : String(error)}
         />
@@ -366,19 +329,54 @@ function CommitSection(props: {
     }
   }
 
-  const loadCommits = () => {
+  const loadCommits = async () => {
     const directory = props.directory
     if (!directory) {
       setCommits([])
+      setHasMore(false)
       return
     }
-    gitActions
-      .log(directory, 20)
-      .then((result) => setCommits(result))
-      .catch(() => setCommits([]))
+    try {
+      const result = await gitActions.log(directory, HISTORY_PAGE, 0)
+      setCommits(result)
+      setHasMore(result.length >= HISTORY_PAGE)
+    } catch {
+      setCommits([])
+      setHasMore(false)
+    }
+  }
+
+  const loadMoreCommits = async () => {
+    const directory = props.directory
+    if (!directory || loadingMore() || !hasMore()) return
+    setLoadingMore(true)
+    try {
+      const result = await gitActions.log(directory, HISTORY_PAGE, commits().length)
+      setCommits((list) => [...list, ...result])
+      setHasMore(result.length >= HISTORY_PAGE)
+    } catch {
+      setHasMore(false)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  const onHistoryScroll = (event: UIEvent) => {
+    const element = event.currentTarget as HTMLElement
+    if (element.scrollTop + element.clientHeight >= element.scrollHeight - 24) void loadMoreCommits()
   }
 
   onMount(loadCommits)
+  createEffect(
+    on(
+      () => props.directory,
+      () => {
+        setCommits([])
+        setHasMore(true)
+      },
+      { defer: true },
+    ),
+  )
   createEffect(() => {
     props.directory
     props.refresh
@@ -667,28 +665,53 @@ function CommitSection(props: {
           onClick={() => void requestUndoCommit()}
         />
       </div>
-      <div class="mt-1 flex items-center gap-1.5 px-1 text-[11px] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
-        <Icon name="archive" size="small" />
+      <button
+        type="button"
+        class="mt-1 flex items-center gap-1 px-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted hover:text-v2-text-text-base focus-visible:outline-none"
+        onClick={() => setHistoryOpen((value) => !value)}
+      >
+        <Icon
+          name="outline-chevron-down"
+          size="small"
+          class={`shrink-0 transition-transform ${historyOpen() ? "" : "-rotate-90"}`}
+        />
+        <Icon name="archive" size="small" class="shrink-0" />
         {language.t("shell.git.history")}
-      </div>
-      <div class="flex flex-col">
-        <Show when={commits().length > 0} fallback={<EmptyState text={language.t("shell.git.noHistory")} />}>
-          <For each={commits()}>
-            {(commit) => (
-              <div
-                class="flex min-w-0 items-center gap-2 rounded-sm px-1.5 py-[3px] text-[12px] leading-5 hover:bg-v2-overlay-simple-overlay-hover"
-                title={`${commit.hash} ${commit.subject}`}
-              >
-                <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{commit.hash}</span>
-                <span class="min-w-0 flex-1 truncate text-v2-text-text-base">{commit.subject}</span>
-                <span class="shrink-0 text-[11px] text-v2-text-text-muted">
-                  {commit.author} · {commit.when}
-                </span>
+      </button>
+      <Show when={historyOpen()}>
+        <div
+          class="flex max-h-[260px] flex-col overflow-y-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent"
+          onScroll={onHistoryScroll}
+        >
+          <Show when={commits().length > 0} fallback={<EmptyState text={language.t("shell.git.noHistory")} />}>
+            <For each={commits()}>
+              {(commit) => (
+                <div
+                  class="flex min-w-0 shrink-0 items-center gap-2 rounded-sm px-1.5 py-[3px] text-[12px] leading-5 hover:bg-v2-overlay-simple-overlay-hover"
+                  title={`${commit.hash} ${commit.subject}`}
+                >
+                  <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{commit.hash}</span>
+                  <span class="min-w-0 flex-1 truncate text-v2-text-text-base">{commit.subject}</span>
+                  <span class="shrink-0 text-[11px] text-v2-text-text-muted">
+                    {commit.author} · {commit.when}
+                  </span>
+                </div>
+              )}
+            </For>
+            <Show when={loadingMore()}>
+              <div class="flex items-center justify-center gap-2 py-2 text-[12px] text-v2-text-text-muted">
+                <Spinner />
+                {language.t("common.loading")}
               </div>
-            )}
-          </For>
-        </Show>
-      </div>
+            </Show>
+            <Show when={!loadingMore() && !hasMore() && commits().length > 0}>
+              <div class="py-2 text-center text-[11px] text-v2-text-text-faint">
+                {language.t("shell.git.history.noMore")}
+              </div>
+            </Show>
+          </Show>
+        </div>
+      </Show>
     </section>
   )
 }

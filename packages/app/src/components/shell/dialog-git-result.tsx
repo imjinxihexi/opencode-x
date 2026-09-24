@@ -31,7 +31,7 @@ export function DialogGitResult(props: {
       <DialogHeader>
         <DialogTitle>{props.title}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="flex w-full flex-1 flex-col justify-center gap-3 px-4 py-6">
+      <DialogBody class="flex w-full flex-1 flex-col justify-center gap-3 px-4 py-3">
         <div class="flex items-center justify-center gap-2 text-[13px] leading-5 text-v2-text-text-base">
           <Show when={props.status === "running"}>
             <Spinner />

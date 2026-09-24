@@ -117,6 +117,7 @@ export type ElectronAPI = {
   gitLog: (
     cwd: string,
     limit?: number,
+    skip?: number,
   ) => Promise<{ hash: string; author: string; when: string; subject: string }[]>
   gitFileDiff: (cwd: string, file: string) => Promise<string>
   gitStatusRaw: (cwd: string) => Promise<{ file: string; index: string; worktree: string; untracked: boolean }[]>
@@ -133,8 +134,11 @@ export type ElectronAPI = {
   gitStashApply: (cwd: string, ref: string) => Promise<void>
   gitStashPop: (cwd: string, ref: string) => Promise<void>
   gitStashDrop: (cwd: string, ref: string) => Promise<void>
-  gitClone: (url: string, workspace: string, name: string, branch?: string) => Promise<string>
+  gitClone: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) => Promise<string>
+  gitCreateWorkspaceDir: (root?: string, folder?: string, meta?: unknown) => Promise<string>
+  gitReadWorkspaceMeta: (path: string) => Promise<Record<string, unknown> | undefined>
   gitRemoteBranches: (cwd: string) => Promise<string[]>
+  gitLsRemoteBranches: (url: string) => Promise<string[]>
   getWindowFocused: () => Promise<boolean>
   getWindowFullscreen: () => Promise<boolean>
   onWindowFullscreenChanged: (cb: (fullscreen: boolean) => void) => () => void

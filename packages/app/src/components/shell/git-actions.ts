@@ -23,7 +23,7 @@ type GitBridge = {
   gitMergeAbort?: (cwd: string) => Promise<void>
   gitConflictSides?: (cwd: string, file: string) => Promise<{ base: string; ours: string; theirs: string }>
   gitWriteResolved?: (cwd: string, file: string, content: string) => Promise<void>
-  gitLog?: (cwd: string, limit?: number) => Promise<GitCommit[]>
+  gitLog?: (cwd: string, limit?: number, skip?: number) => Promise<GitCommit[]>
   gitFileDiff?: (cwd: string, file: string) => Promise<string>
   gitStatusRaw?: (cwd: string) => Promise<GitFileStatus[]>
   gitStageFile?: (cwd: string, file: string) => Promise<void>
@@ -39,8 +39,11 @@ type GitBridge = {
   gitStashApply?: (cwd: string, ref: string) => Promise<void>
   gitStashPop?: (cwd: string, ref: string) => Promise<void>
   gitStashDrop?: (cwd: string, ref: string) => Promise<void>
-  gitClone?: (url: string, workspace: string, name: string, branch?: string) => Promise<string>
+  gitClone?: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) => Promise<string>
+  gitCreateWorkspaceDir?: (root?: string, folder?: string, meta?: unknown) => Promise<string>
+  gitReadWorkspaceMeta?: (path: string) => Promise<Record<string, unknown> | undefined>
   gitRemoteBranches?: (cwd: string) => Promise<string[]>
+  gitLsRemoteBranches?: (url: string) => Promise<string[]>
 }
 
 function bridge(): GitBridge | undefined {
@@ -79,7 +82,8 @@ export const gitActions = {
     bridge()?.gitConflictSides?.(cwd, file) ?? Promise.resolve({ base: "", ours: "", theirs: "" }),
   writeResolved: (cwd: string, file: string, content: string) =>
     bridge()?.gitWriteResolved?.(cwd, file, content) ?? Promise.resolve(),
-  log: (cwd: string, limit?: number) => bridge()?.gitLog?.(cwd, limit) ?? Promise.resolve([] as GitCommit[]),
+  log: (cwd: string, limit?: number, skip?: number) =>
+    bridge()?.gitLog?.(cwd, limit, skip) ?? Promise.resolve([] as GitCommit[]),
   fileDiff: (cwd: string, file: string) => bridge()?.gitFileDiff?.(cwd, file) ?? Promise.resolve(""),
   status: (cwd: string) => bridge()?.gitStatusRaw?.(cwd) ?? Promise.resolve([] as GitFileStatus[]),
   stageFile: (cwd: string, file: string) => bridge()?.gitStageFile?.(cwd, file) ?? Promise.resolve(),
@@ -105,7 +109,13 @@ export const gitActions = {
   stashApply: (cwd: string, ref: string) => bridge()?.gitStashApply?.(cwd, ref) ?? Promise.resolve(),
   stashPop: (cwd: string, ref: string) => bridge()?.gitStashPop?.(cwd, ref) ?? Promise.resolve(),
   stashDrop: (cwd: string, ref: string) => bridge()?.gitStashDrop?.(cwd, ref) ?? Promise.resolve(),
-  clone: (url: string, workspace: string, name: string, branch?: string) =>
-    bridge()?.gitClone?.(url, workspace, name, branch) ?? Promise.resolve(""),
+  clone: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) =>
+    bridge()?.gitClone?.(url, workspace, name, branch, root, folder) ?? Promise.resolve(""),
+  createWorkspaceDir: (root?: string, folder?: string, meta?: unknown) =>
+    bridge()?.gitCreateWorkspaceDir?.(root, folder, meta ? JSON.parse(JSON.stringify(meta)) : undefined) ??
+    Promise.resolve(""),
+  readWorkspaceMeta: (path: string) =>
+    bridge()?.gitReadWorkspaceMeta?.(path) ?? Promise.resolve(undefined),
   remoteBranches: (cwd: string) => bridge()?.gitRemoteBranches?.(cwd) ?? Promise.resolve([] as string[]),
+  lsRemoteBranches: (url: string) => bridge()?.gitLsRemoteBranches?.(url) ?? Promise.resolve([] as string[]),
 }

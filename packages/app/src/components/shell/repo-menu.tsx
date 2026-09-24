@@ -1,4 +1,4 @@
-import { For, createSignal } from "solid-js"
+import { For, createSignal, type JSX } from "solid-js"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -158,8 +158,10 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
           <MenuV2.Separator />
 
           <MenuV2.Sub gutter={0} overlap overflowPadding={8}>
-            <MenuV2.SubTrigger>
-              <Icon name="archive" size="small" />
+            <MenuV2.SubTrigger
+              style={{ "--menu-v2-fg": "#f85149", "--menu-v2-icon": "#f85149" } as JSX.CSSProperties}
+            >
+              <Icon name="trash" size="small" />
               <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.delete")}</span>
             </MenuV2.SubTrigger>
             <MenuV2.Portal>

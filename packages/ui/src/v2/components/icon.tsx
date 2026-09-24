@@ -79,7 +79,7 @@ const icons = {
   },
   workspace: {
     viewBox: "0 0 16 16",
-    body: `<path d="M2 10.668V14.0013H10.6667M13.9974 10.6667V2H2.66406M13.9974 10.668V14.0013H10.6641M2 10V2H5.33333" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/><path d="M10.6693 10.6654V5.33203H5.33594V10.6654H10.6693Z" fill="currentColor"/>`,
+    body: `<path d="M8 1.75L14.25 5L8 8.25L1.75 5L8 1.75Z" stroke="currentColor" stroke-linejoin="round"/><path d="M1.75 8L8 11.25L14.25 8" stroke="currentColor" stroke-linejoin="round"/><path d="M1.75 11L8 14.25L14.25 11" stroke="currentColor" stroke-linejoin="round"/>`,
   },
   close: {
     viewBox: "0 0 20 20",
@@ -140,6 +140,14 @@ const icons = {
   robot: {
     viewBox: "0 0 16 16",
     body: `<rect x="3.25" y="4.75" width="9.5" height="8" rx="1.75" stroke="currentColor"/><path d="M8 4.75V2.85" stroke="currentColor"/><circle cx="8" cy="2" r="0.9" fill="currentColor"/><circle cx="6.1" cy="7.7" r="0.9" fill="currentColor"/><circle cx="9.9" cy="7.7" r="0.9" fill="currentColor"/><path d="M6.4 10.5H9.6" stroke="currentColor"/>`,
+  },
+  trash: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M2.5 4.5H13.5" stroke="currentColor"/><path d="M6.5 2.5H9.5" stroke="currentColor"/><path d="M4.25 4.5L4.91667 13.5H11.0833L11.75 4.5" stroke="currentColor"/><path d="M6.75 7.5V10.5M9.25 7.5V10.5" stroke="currentColor"/>`,
+  },
+  play: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M5.25 3.75L11.75 8L5.25 12.25V3.75Z" stroke="currentColor" stroke-linejoin="round"/>`,
   },
   reset: {
     viewBox: "0 0 20 20",

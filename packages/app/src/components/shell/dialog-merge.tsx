@@ -60,7 +60,7 @@ export function DialogMerge(props: { directory: string; onMerged: () => void }) 
       <DialogHeader>
         <DialogTitle>{language.t("shell.git.merge.title")}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="flex w-full flex-col gap-4 px-4 pt-4 pb-1">
+      <DialogBody class="flex w-full flex-col gap-4 px-4 pt-2 pb-1">
         <div class="rounded-md bg-v2-background-bg-layer-02 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
           {language.t("shell.git.merge.hint", { target: current() ?? "" })}
         </div>

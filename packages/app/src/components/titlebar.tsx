@@ -34,7 +34,7 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { readSessionTabsRemovedDetail, SESSION_TABS_REMOVED_EVENT } from "@/components/titlebar-session-events"
 import { useGlobal } from "@/context/global"
 import { ServerConnection, useServer } from "@/context/server"
-import { tabKey, useTabs } from "@/context/tabs"
+import { tabKey, useTabs, type Tab } from "@/context/tabs"
 import type { PromptSession } from "@/context/prompt"
 import "./titlebar.css"
 import { newTabTooltipKeybind } from "./command-tooltip-keybind"
@@ -61,7 +61,13 @@ export function useTitlebarRightMount() {
   return mount
 }
 
-export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visible: boolean; toggle: () => void } }) {
+export function Titlebar(props: {
+  update?: TitlebarUpdate
+  debugTools?: { visible: boolean; toggle: () => void }
+  workspacesActive?: boolean
+  onToggleWorkspaces?: () => void
+  tabFilter?: (tab: Tab) => boolean
+}) {
   const layout = useLayout()
   const platform = usePlatform()
   const command = useCommand()
@@ -395,8 +401,24 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
                   />
                 </TooltipV2>
 
+                <Show when={props.onToggleWorkspaces}>
+                  <TooltipV2 placement="bottom" value={language.t("shell.workspace.grid.overview")}>
+                    <IconButtonV2
+                      type="button"
+                      variant="ghost-muted"
+                      size="large"
+                      class="!w-9 shrink-0"
+                      icon={<IconV2 name="workspace" />}
+                      state={props.workspacesActive ? "pressed" : undefined}
+                      onClick={() => props.onToggleWorkspaces?.()}
+                      aria-label={language.t("shell.workspace.grid.overview")}
+                      aria-pressed={props.workspacesActive}
+                    />
+                  </TooltipV2>
+                </Show>
+
                 <TitlebarTabStrip
-                  tabs={tabsStore}
+                  tabs={props.tabFilter ? tabsStore.filter(props.tabFilter) : tabsStore}
                   currentTab={currentTab}
                   forceTruncate={tabsAreOverflowing()}
                   onOverflowChange={setTabsAreOverflowing}

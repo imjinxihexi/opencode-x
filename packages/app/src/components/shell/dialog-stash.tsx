@@ -42,7 +42,7 @@ export function DialogStash(props: { directory: string; onChanged: () => void })
       <DialogHeader>
         <DialogTitle>{language.t("shell.git.stash.title")}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="flex w-full flex-col gap-3 px-4 pt-4 pb-2">
+      <DialogBody class="flex w-full flex-col gap-3 px-4 pt-2 pb-2">
         <Show
           when={stashes().length > 0}
           fallback={

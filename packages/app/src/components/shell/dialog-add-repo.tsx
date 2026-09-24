@@ -1,12 +1,15 @@
-import { createSignal } from "solid-js"
+import { For, Show, createSignal } from "solid-js"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode-ai/ui/v2/dialog-v2"
 import { Field } from "@opencode-ai/ui/v2/field-v2"
+import { Icon } from "@opencode-ai/ui/v2/icon"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { gitActions } from "@/components/shell/git-actions"
 import type { WorkspaceRepo } from "@/components/shell/workspaces"
+import { Spinner } from "@/components/shell/spinner"
+import { SelectV2 } from "@opencode-ai/ui/v2/select-v2"
 import { useLanguage } from "@/context/language"
 
 function nameFromUrl(url: string) {
@@ -15,13 +18,57 @@ function nameFromUrl(url: string) {
   return segment.replace(/[^a-zA-Z0-9._-]/g, "-")
 }
 
-export function DialogAddRepo(props: { workspaceName: string; onAdded: (repo: WorkspaceRepo) => void }) {
+const branchCache = new Map<string, string[]>()
+
+export function DialogAddRepo(props: {
+  workspaceName: string
+  root?: string
+  folder?: string
+  existing?: WorkspaceRepo[]
+  onAdded: (repo: WorkspaceRepo) => void
+}) {
   const language = useLanguage()
   const dialog = useDialog()
   const [url, setUrl] = createSignal("")
   const [name, setName] = createSignal("")
+  const [nameTouched, setNameTouched] = createSignal(false)
   const [branch, setBranch] = createSignal("")
   const [busy, setBusy] = createSignal(false)
+  const [branches, setBranches] = createSignal<string[]>([])
+  const [loadingBranches, setLoadingBranches] = createSignal(false)
+
+  const duplicate = () => {
+    const remote = url().trim().replace(/\.git$/, "").replace(/\/+$/, "").toLowerCase()
+    const repoName = (name().trim() || nameFromUrl(url())).toLowerCase()
+    if (!remote && !repoName) return false
+    return (props.existing ?? []).some((repo) => {
+      const repoRemote = repo.remote?.replace(/\.git$/, "").replace(/\/+$/, "").toLowerCase()
+      if (remote && repoRemote === remote) return true
+      return Boolean(repoName) && repo.name.toLowerCase() === repoName
+    })
+  }
+  const fetchBranches = async () => {
+    const remote = url().trim()
+    if (!remote) {
+      setBranches([])
+      return
+    }
+    const cached = branchCache.get(remote)
+    if (cached) {
+      setBranches(cached)
+      return
+    }
+    setLoadingBranches(true)
+    try {
+      const result = await gitActions.lsRemoteBranches(remote)
+      branchCache.set(remote, result)
+      if (url().trim() === remote) setBranches(result)
+    } catch {
+      if (url().trim() === remote) setBranches([])
+    } finally {
+      setLoadingBranches(false)
+    }
+  }
 
   const submit = async () => {
     const remote = url().trim()
@@ -29,9 +76,17 @@ export function DialogAddRepo(props: { workspaceName: string; onAdded: (repo: Wo
     if (!remote || !repoName) return
     setBusy(true)
     try {
-      const directory = await gitActions.clone(remote, props.workspaceName, repoName, branch().trim() || undefined)
+      const directory = await gitActions.clone(
+        remote,
+        props.workspaceName,
+        repoName,
+        branch().trim() || undefined,
+        props.root,
+        props.folder,
+      )
       if (!directory) throw new Error(language.t("shell.workspace.addRepo.failed"))
-      props.onAdded({ directory, name: repoName, remote, branch: branch().trim() || undefined })
+      const used = branch().trim() || (await gitActions.currentBranch(directory).catch(() => ""))
+      props.onAdded({ directory, name: repoName, remote, branch: used || undefined })
       dialog.close()
     } catch (error) {
       dialog.show(() => (
@@ -51,7 +106,7 @@ export function DialogAddRepo(props: { workspaceName: string; onAdded: (repo: Wo
       <DialogHeader>
         <DialogTitle>{language.t("shell.workspace.addRepo.title")}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="flex w-full flex-col gap-4 px-4 pt-4 pb-1">
+      <DialogBody class="flex w-full flex-col gap-4 px-4 pt-2 pb-1">
         <div class="rounded-md bg-v2-background-bg-layer-02 px-3 py-2 text-[12px] leading-5 text-v2-text-text-muted">
           {language.t("shell.workspace.addRepo.into", { workspace: props.workspaceName })}
         </div>
@@ -63,7 +118,13 @@ export function DialogAddRepo(props: { workspaceName: string; onAdded: (repo: Wo
             class="!w-full"
             value={url()}
             placeholder="https://gitlab.example.com/group/project.git"
-            onInput={(event) => setUrl(event.currentTarget.value)}
+            onInput={(event) => {
+              setUrl(event.currentTarget.value)
+              setBranch("")
+              setBranches([])
+              if (nameTouched()) return
+              setName(nameFromUrl(event.currentTarget.value))
+            }}
           />
           <Field.Prefix>{language.t("shell.workspace.addRepo.urlHint")}</Field.Prefix>
         </Field>
@@ -74,17 +135,34 @@ export function DialogAddRepo(props: { workspaceName: string; onAdded: (repo: Wo
               class="!w-full"
               value={name()}
               placeholder={nameFromUrl(url()) || "my-project"}
-              onInput={(event) => setName(event.currentTarget.value)}
+              onInput={(event) => {
+                setNameTouched(true)
+                setName(event.currentTarget.value)
+              }}
             />
           </Field>
           <Field>
             <Field.Label>{language.t("shell.workspace.addRepo.branch")}</Field.Label>
-            <TextInputV2
-              class="!w-full"
-              value={branch()}
-              placeholder={language.t("shell.workspace.addRepo.branchPlaceholder")}
-              onInput={(event) => setBranch(event.currentTarget.value)}
-            />
+            <div class="relative w-full">
+              <SelectV2
+                class="!w-full"
+                options={branches()}
+                current={branch() || undefined}
+                placeholder={language.t("shell.workspace.addRepo.branchPlaceholder")}
+                value={(value) => value}
+                label={(value) => value}
+                disabled={!url().trim()}
+                onOpenChange={(open) => {
+                  if (open) void fetchBranches()
+                }}
+                onSelect={(value) => setBranch(value ?? "")}
+              />
+              <Show when={loadingBranches()}>
+                <div class="pointer-events-none absolute end-8 top-1/2 -translate-y-1/2">
+                  <Spinner />
+                </div>
+              </Show>
+            </div>
           </Field>
         </div>
         <div class="text-[11px] leading-4 text-v2-text-text-muted">{language.t("shell.workspace.addRepo.nameHint")}</div>
@@ -94,6 +172,9 @@ export function DialogAddRepo(props: { workspaceName: string; onAdded: (repo: Wo
           {language.t("common.cancel")}
         </ButtonV2>
         <ButtonV2 type="button" variant="contrast" disabled={busy() || !url().trim()} onClick={() => void submit()}>
+          <Show when={busy()}>
+            <Spinner class="!text-[#ffffff]" />
+          </Show>
           {language.t("shell.workspace.addRepo.submit")}
         </ButtonV2>
       </DialogFooter>
