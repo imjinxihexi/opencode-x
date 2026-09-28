@@ -1,5 +1,7 @@
-import { Show, createResource } from "solid-js"
+import { Show, createResource, createSignal } from "solid-js"
+import { Dynamic } from "solid-js/web"
 import { getFilename } from "@opencode-ai/core/util/path"
+import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Spinner } from "@/components/shell/spinner"
@@ -8,8 +10,8 @@ import { useServerSDK } from "@/context/server-sdk"
 
 export type FileContentTarget = { directory: string; file: string }
 
-// Right-hand column showing a repository file's content, opened from the git
-// panel's file tree (same slot as the diff panel).
+// Right-hand column showing a repository file with syntax highlighting,
+// opened from the git panel's file tree (same slot as the diff panel).
 export function FileContentPanel(props: {
   target: FileContentTarget
   width: number
@@ -21,6 +23,7 @@ export function FileContentPanel(props: {
 }) {
   const language = useLanguage()
   const sdk = useServerSDK()
+  const fileComponent = useFileComponent()
   const [content] = createResource(
     () => [props.target.directory, props.target.file, props.refresh] as const,
     async ([directory, file]) => {
@@ -32,6 +35,13 @@ export function FileContentPanel(props: {
       return data.content
     },
   )
+
+  const [copied, setCopied] = createSignal<"content" | "path">()
+  const copy = async (kind: "content" | "path", value: string) => {
+    await navigator.clipboard?.writeText(value)
+    setCopied(kind)
+    setTimeout(() => setCopied((current) => (current === kind ? undefined : current)), 1500)
+  }
 
   return (
     <aside
@@ -46,6 +56,34 @@ export function FileContentPanel(props: {
         >
           {getFilename(props.target.file)}
         </span>
+        <button
+          type="button"
+          class="flex h-6 shrink-0 items-center gap-1 rounded-sm px-1.5 text-[11px] focus-visible:outline-none"
+          classList={{
+            "text-[#3fb950]": copied() === "content",
+            "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base":
+              copied() !== "content",
+          }}
+          title={language.t("shell.file.copyContent")}
+          onClick={() => void copy("content", content() ?? "")}
+        >
+          <Icon name={copied() === "content" ? "check" : "outline-copy"} size="small" />
+          {language.t("shell.file.copyContent")}
+        </button>
+        <button
+          type="button"
+          class="flex h-6 shrink-0 items-center gap-1 rounded-sm px-1.5 text-[11px] focus-visible:outline-none"
+          classList={{
+            "text-[#3fb950]": copied() === "path",
+            "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base":
+              copied() !== "path",
+          }}
+          title={language.t("shell.file.copyPath")}
+          onClick={() => void copy("path", `${props.target.directory}/${props.target.file}`)}
+        >
+          <Icon name={copied() === "path" ? "check" : "outline-copy"} size="small" />
+          {language.t("shell.file.copyPath")}
+        </button>
         <button
           type="button"
           class="flex size-6 shrink-0 items-center justify-center rounded-sm text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
@@ -63,9 +101,15 @@ export function FileContentPanel(props: {
               <div class="py-8 text-center text-[12px] text-v2-text-text-muted">{language.t("common.empty")}</div>
             }
           >
-            <pre class="p-3 font-mono text-[12px] leading-5 whitespace-pre-wrap break-words text-v2-text-text-base">
-              {content()}
-            </pre>
+            <Dynamic
+              component={fileComponent}
+              mode="text"
+              file={{
+                name: props.target.file,
+                contents: content(),
+                cacheKey: `${props.target.file}:${props.refresh ?? 0}`,
+              }}
+            />
           </Show>
         </Show>
       </div>

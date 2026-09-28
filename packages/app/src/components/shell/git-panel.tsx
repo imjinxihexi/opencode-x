@@ -36,6 +36,7 @@ export function GitPanel(props: {
   activeFile?: string
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
   onOpenFile?: (target: { directory: string; file: string }) => void
+  contentTarget?: { directory: string; file: string }
   hideResize?: boolean
   conflicts: string[]
   activeModel?: { providerID: string; modelID: string }
@@ -138,6 +139,12 @@ export function GitPanel(props: {
         {/* One level = chevron + gap plus a small offset for clearer nesting. */}
         <div
           class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+          classList={{
+            "bg-v2-overlay-simple-overlay-pressed":
+              node.entry.type === "file" &&
+              props.contentTarget?.file === path() &&
+              props.contentTarget?.directory === props.selectedRepo,
+          }}
           style={{ "padding-inline-start": `${node.depth * 32 + 6}px` }}
           title={path()}
           onClick={() =>
@@ -164,7 +171,11 @@ export function GitPanel(props: {
           <Show
             when={children.state !== "pending"}
             fallback={
-              <div class="px-1 py-1 text-[11px] text-v2-text-text-muted" style={{ "padding-inline-start": `${(node.depth + 1) * 12 + 6}px` }}>
+              <div
+                class="flex items-center justify-center gap-2 py-2 text-[11px] text-v2-text-text-muted"
+                style={{ "padding-inline-start": `${node.depth * 32 + 6}px` }}
+              >
+                <Spinner />
                 {language.t("common.loading")}
               </div>
             }
@@ -287,7 +298,12 @@ export function GitPanel(props: {
                 </div>
                 <Show
                   when={entries.state !== "pending"}
-                  fallback={<div class="px-1 py-4 text-[12px] text-v2-text-text-muted">{language.t("common.loading")}</div>}
+                  fallback={
+                    <div class="flex items-center justify-center gap-2 py-8 text-[12px] text-v2-text-text-muted">
+                      <Spinner />
+                      {language.t("common.loading")}
+                    </div>
+                  }
                 >
                   <For each={entryStore}>
                     {(entry) => <EntryNode entry={entry} parent="." depth={0} />}

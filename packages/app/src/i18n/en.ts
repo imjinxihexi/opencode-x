@@ -743,6 +743,8 @@ export const dict = {
   "shell.projects.remove": "Remove project",
   "shell.workspace.revealFolder": "Reveal folder",
   "shell.workspace.pull.title": "Pull latest",
+  "shell.file.copyContent": "File content",
+  "shell.file.copyPath": "File path",
   "shell.workspace.pull.running": "Pulling…",
   "shell.workspace.pull.success": "All projects are up to date",
   "shell.workspace.title": "Workspaces",

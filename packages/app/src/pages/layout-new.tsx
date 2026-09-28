@@ -625,6 +625,7 @@ export default function NewLayout(props: ParentProps) {
             activeFile={diffTarget()?.file}
             onOpenDiff={(target) => setDiffTarget(target)}
             onOpenFile={(target) => setContentTarget(target)}
+            contentTarget={contentTarget()}
             hideResize={Boolean(diffTarget()) || Boolean(contentTarget())}
             conflicts={conflicts() ?? []}
             activeModel={activeModel()}

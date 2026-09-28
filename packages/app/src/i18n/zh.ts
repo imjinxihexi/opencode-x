@@ -808,6 +808,8 @@ export const dict = {
   "shell.projects.remove": "移除项目",
   "shell.workspace.revealFolder": "定位到对应的文件夹",
   "shell.workspace.pull.title": "拉取最新",
+  "shell.file.copyContent": "文件内容",
+  "shell.file.copyPath": "文件路径",
   "shell.workspace.pull.running": "正在拉取…",
   "shell.workspace.pull.success": "所有项目已是最新",
   "shell.workspace.title": "工作空间",
