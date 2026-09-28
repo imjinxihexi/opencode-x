@@ -39,6 +39,7 @@ import type { PromptSession } from "@/context/prompt"
 import "./titlebar.css"
 import { newTabTooltipKeybind } from "./command-tooltip-keybind"
 import { normalizeSessionInfo } from "@/utils/session"
+import { Spinner } from "@/components/shell/spinner"
 
 const legacyTitlebarHeight = 40
 const v2TitlebarHeight = 36
@@ -67,6 +68,8 @@ export function Titlebar(props: {
   workspacesActive?: boolean
   onToggleWorkspaces?: () => void
   tabFilter?: (tab: Tab) => boolean
+  /** Fixed directory for new tabs, e.g. a locked workspace window's first repo */
+  newTabDirectory?: () => string | undefined
 }) {
   const layout = useLayout()
   const platform = usePlatform()
@@ -267,55 +270,72 @@ export function Titlebar(props: {
               tabsStoreActions.removeSessions(detail)
             })
 
-            const openNewTab = () => {
-              const route = layout.route()
-              const activeSession = session()
-              if (route.type === "session" && activeSession) {
-                const sessionTab = {
-                  type: "session" as const,
-                  server: route.server ?? server.key,
-                  sessionId: activeSession.id,
-                }
-                const model = tabs.stateValue<PromptSession>(sessionTab, "prompt")?.model.current()
-                tabs.newDraft({ server: sessionTab.server, directory: activeSession.directory }, "", model)
-                return
-              }
+            const [creatingTab, setCreatingTab] = createSignal(false)
 
-              const activeTab = currentTab()
-              if (activeTab?.type === "draft") {
-                const model = tabs.stateValue<PromptSession>(activeTab, "prompt")?.model.current()
-                tabs.newDraft({ server: activeTab.server, directory: activeTab.directory }, "", model)
-                return
-              }
-
-              if (route.type === "home") {
-                const selection = layout.home.selection()
-                const conn = global.servers.list().find((item) => ServerConnection.key(item) === selection.server)
-                const project = conn
-                  ? global
-                      .ensureServerCtx(conn)
-                      .projects.list()
-                      .find((item) => item.worktree === selection.directory)
-                  : undefined
-                if (conn && project) {
-                  tabs.newDraft({ server: ServerConnection.key(conn), directory: project.worktree }, "")
+            const openNewTab = async () => {
+              if (creatingTab()) return
+              setCreatingTab(true)
+              try {
+                const route = layout.route()
+                const activeSession = session()
+                if (route.type === "session" && activeSession) {
+                  const sessionTab = {
+                    type: "session" as const,
+                    server: route.server ?? server.key,
+                    sessionId: activeSession.id,
+                  }
+                  const model = tabs.stateValue<PromptSession>(sessionTab, "prompt")?.model.current()
+                  await tabs.newDraft({ server: sessionTab.server, directory: activeSession.directory }, "", model)
                   return
                 }
+
+                const activeTab = currentTab()
+                if (activeTab?.type === "draft") {
+                  const model = tabs.stateValue<PromptSession>(activeTab, "prompt")?.model.current()
+                  await tabs.newDraft({ server: activeTab.server, directory: activeTab.directory }, "", model)
+                  return
+                }
+
+                const fixedDirectory = props.newTabDirectory?.()
+                if (fixedDirectory) {
+                  const model = activeTab
+                    ? tabs.stateValue<PromptSession>(activeTab, "prompt")?.model.current()
+                    : undefined
+                  await tabs.newDraft({ server: server.key, directory: fixedDirectory }, "", model)
+                  return
+                }
+
+                if (route.type === "home") {
+                  const selection = layout.home.selection()
+                  const conn = global.servers.list().find((item) => ServerConnection.key(item) === selection.server)
+                  const project = conn
+                    ? global
+                        .ensureServerCtx(conn)
+                        .projects.list()
+                        .find((item) => item.worktree === selection.directory)
+                    : undefined
+                  if (conn && project) {
+                    await tabs.newDraft({ server: ServerConnection.key(conn), directory: project.worktree }, "")
+                    return
+                  }
+                }
+
+                const current = layout.projects.list()[0]
+                if (current) {
+                  await tabs.newDraft({ server: server.key, directory: current.worktree }, "")
+                  return
+                }
+
+                const fallback = global.servers.list().flatMap((conn) => {
+                  const project = global.ensureServerCtx(conn).projects.list()[0]
+                  return project ? [{ server: ServerConnection.key(conn), project }] : []
+                })[0]
+                if (!fallback) return
+
+                await tabs.newDraft({ server: fallback.server, directory: fallback.project.worktree }, "")
+              } finally {
+                setCreatingTab(false)
               }
-
-              const current = layout.projects.list()[0]
-              if (current) {
-                tabs.newDraft({ server: server.key, directory: current.worktree }, "")
-                return
-              }
-
-              const fallback = global.servers.list().flatMap((conn) => {
-                const project = global.ensureServerCtx(conn).projects.list()[0]
-                return project ? [{ server: ServerConnection.key(conn), project }] : []
-              })[0]
-              if (!fallback) return
-
-              tabs.newDraft({ server: fallback.server, directory: fallback.project.worktree }, "")
             }
             const toggleHome = () => tabs.toggleHome({ home: layout.route().type === "home", current: currentTab() })
 
@@ -446,8 +466,13 @@ export function Titlebar(props: {
                     variant="ghost-muted"
                     size="large"
                     class="shrink-0"
-                    icon={<IconV2 name="plus" />}
-                    onClick={openNewTab}
+                    icon={
+                      <Show when={!creatingTab()} fallback={<Spinner class="!text-v2-text-text-base" />}>
+                        <IconV2 name="plus" />
+                      </Show>
+                    }
+                    disabled={creatingTab()}
+                    onClick={() => void openNewTab()}
                     aria-label={language.t("command.session.new")}
                   />
                 </TooltipV2>

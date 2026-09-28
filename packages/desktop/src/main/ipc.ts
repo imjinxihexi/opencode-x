@@ -12,6 +12,7 @@ import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
 import {
+  createMainWindow,
   getPinchZoomEnabled,
   getWindowID,
   openExternalURL,
@@ -30,14 +31,17 @@ import {
   checkout as gitCheckout,
   clone as gitClone,
   createWorkspaceDir as gitCreateWorkspaceDir,
+  workspacePath as gitWorkspacePath,
   readWorkspaceMeta as gitReadWorkspaceMeta,
   commit as gitCommit,
   conflictSides as gitConflictSides,
   conflicts as gitConflicts,
   createBranch as gitCreateBranch,
   currentBranch as gitCurrentBranch,
+  headBranch as gitHeadBranch,
   deleteBranch as gitDeleteBranch,
   discard as gitDiscard,
+  discardFile as gitDiscardFile,
   fetchRemote as gitFetch,
   fileDiff as gitFileDiff,
   hasTrackedChanges as gitHasTrackedChanges,
@@ -48,6 +52,7 @@ import {
   pull as gitPull,
   push as gitPush,
   pushForce as gitPushForce,
+  unpushed as gitUnpushed,
   remoteBranches as gitRemoteBranches,
   lsRemoteBranches as gitLsRemoteBranches,
   resolveConflict as gitResolveConflict,
@@ -122,12 +127,15 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("git-commit", (_event: IpcMainInvokeEvent, cwd: string, message: string) => gitCommit(cwd, message))
   ipcMain.handle("git-push", (_event: IpcMainInvokeEvent, cwd: string) => gitPush(cwd))
   ipcMain.handle("git-push-force", (_event: IpcMainInvokeEvent, cwd: string) => gitPushForce(cwd))
+  ipcMain.handle("git-unpushed", (_event: IpcMainInvokeEvent, cwd: string) => gitUnpushed(cwd))
+  ipcMain.handle("git-discard-file", (_event: IpcMainInvokeEvent, cwd: string, file: string) => gitDiscardFile(cwd, file))
   ipcMain.handle("git-discard", (_event: IpcMainInvokeEvent, cwd: string) => gitDiscard(cwd))
   ipcMain.handle("git-merge", (_event: IpcMainInvokeEvent, cwd: string, branch: string) => gitMerge(cwd, branch))
   ipcMain.handle("git-merge-preview", (_event: IpcMainInvokeEvent, cwd: string, source: string, target: string) =>
     gitMergePreview(cwd, source, target),
   )
   ipcMain.handle("git-current-branch", (_event: IpcMainInvokeEvent, cwd: string) => gitCurrentBranch(cwd))
+  ipcMain.handle("git-head-branch", (_event: IpcMainInvokeEvent, cwd: string) => gitHeadBranch(cwd))
   ipcMain.handle("git-has-changes", (_event: IpcMainInvokeEvent, cwd: string) => gitHasTrackedChanges(cwd))
   ipcMain.handle("git-conflicts", (_event: IpcMainInvokeEvent, cwd: string) => gitConflicts(cwd))
   ipcMain.handle("git-resolve-conflict", (_event: IpcMainInvokeEvent, cwd: string, file: string, side: string) =>
@@ -182,6 +190,9 @@ export function registerIpcHandlers(deps: Deps) {
       gitCreateWorkspaceDir(root, folder ?? "", meta),
   )
   ipcMain.handle("git-read-workspace-meta", (_event: IpcMainInvokeEvent, path: string) => gitReadWorkspaceMeta(path))
+  ipcMain.handle("git-workspace-path", (_event: IpcMainInvokeEvent, root?: string, folder?: string) =>
+    gitWorkspacePath(root, folder),
+  )
   ipcMain.handle("git-remote-branches", (_event: IpcMainInvokeEvent, cwd: string) => gitRemoteBranches(cwd))
   ipcMain.handle("git-ls-remote-branches", (_event: IpcMainInvokeEvent, url: string) => gitLsRemoteBranches(url))
   ipcMain.handle("await-initialization", () => deps.awaitInitialization())
@@ -411,6 +422,16 @@ export function registerIpcHandlers(deps: Deps) {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
     setTitlebar(win, theme)
+  })
+  ipcMain.handle("open-window", (_event: IpcMainInvokeEvent, route?: string) => {
+    // Resolve only once the window is actually visible so the caller's
+    // loading state covers the whole window-opening wait.
+    const win = typeof route === "string" ? createMainWindow(undefined, route) : createMainWindow()
+    return new Promise<void>((resolve) => {
+      if (win.isDestroyed()) return resolve()
+      win.once("ready-to-show", () => resolve())
+      win.once("closed", () => resolve())
+    })
   })
   ipcMain.handle("run-desktop-menu-action", (event: IpcMainInvokeEvent, action: DesktopMenuAction) => {
     runDesktopMenuAction(BrowserWindow.fromWebContents(event.sender), action, {

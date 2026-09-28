@@ -165,7 +165,7 @@ export function setDockIcon() {
   if (!icon.isEmpty()) app.dock?.setIcon(icon)
 }
 
-export function createMainWindow(id: string = randomUUID()) {
+export function createMainWindow(id: string = randomUUID(), route?: string) {
   const state = windowState({
     file: windowStateFile(id),
     defaultWidth: 1280,
@@ -223,7 +223,7 @@ export function createMainWindow(id: string = randomUUID()) {
   state.manage(win)
   registerWindow(win, id)
   wireFullscreen(win)
-  loadWindow(win, "index.html")
+  loadWindow(win, "index.html", route)
   wireZoom(win)
 
   win.once("ready-to-show", () => {
@@ -331,15 +331,18 @@ export function registerRendererProtocol() {
   })
 }
 
-function loadWindow(win: BrowserWindow, html: string) {
+// The in-app route is passed as the URL fragment: the renderer router is a
+// MemoryRouter, so it adopts location.hash as its initial history entry.
+function loadWindow(win: BrowserWindow, html: string, route?: string) {
+  const hash = route && /^\/(?!\/)/.test(route) ? `#${route}` : ""
   const devUrl = process.env.ELECTRON_RENDERER_URL
   if (devUrl) {
-    const url = new URL(html, devUrl)
+    const url = new URL(`index.html${hash}`, devUrl)
     void win.loadURL(url.toString())
     return
   }
 
-  void win.loadURL(`${rendererProtocol}://${rendererHost}/${html}`)
+  void win.loadURL(`${rendererProtocol}://${rendererHost}/${html}${hash}`)
 }
 
 function wireWindowRecovery(win: BrowserWindow, name: string) {

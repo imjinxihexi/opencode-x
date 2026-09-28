@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, lstat, readFile, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
-import { join, isAbsolute } from "node:path"
+import { join, isAbsolute, resolve } from "node:path"
 import { promisify } from "node:util"
 
 const execFileAsync = promisify(execFile)
@@ -10,26 +10,63 @@ export type GitBranch = { name: string; current: boolean }
 export type GitCommit = { hash: string; author: string; when: string; subject: string }
 export type GitFileStatus = { file: string; index: string; worktree: string; untracked: boolean }
 
-async function run(cwd: string, args: string[]) {
-  const result = await execFileAsync("git", args, { cwd, windowsHide: true, maxBuffer: 10 * 1024 * 1024 })
-  return result.stdout.trim()
+const INDEX_LOCK_DELAY_MS = 300
+const INDEX_LOCK_RETRIES = 8
+
+// Concurrent git calls (user action vs. background refresh) contend on
+// .git/index.lock; retry briefly instead of surfacing the lock as an error.
+function isIndexLock(error: unknown) {
+  return error instanceof Error && error.message.includes("index.lock")
 }
 
-async function runStdin(cwd: string, args: string[], input: string) {
-  return new Promise<string>((resolve, reject) => {
-    const child = spawn("git", args, { cwd, windowsHide: true })
-    let out = ""
-    let err = ""
-    child.stdout.on("data", (chunk) => (out += chunk))
-    child.stderr.on("data", (chunk) => (err += chunk))
-    child.on("error", reject)
-    child.on("close", (code) => {
-      if (code === 0) resolve(out)
-      else reject(new Error(err.trim() || `git exited with code ${code}`))
+async function withIndexLockRetry(action: () => Promise<void>) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await action()
+      return
+    } catch (error) {
+      if (attempt >= INDEX_LOCK_RETRIES || !isIndexLock(error)) throw error
+      await new Promise((resolve) => setTimeout(resolve, INDEX_LOCK_DELAY_MS))
+    }
+  }
+}
+
+async function run(cwd: string, args: string[], timeoutMs?: number) {
+  let result: { stdout: string }
+  await withIndexLockRetry(async () => {
+    result = await execFileAsync("git", args, {
+      cwd,
+      windowsHide: true,
+      maxBuffer: 10 * 1024 * 1024,
+      ...(timeoutMs ? { timeout: timeoutMs, killSignal: "SIGKILL" as const } : {}),
     })
-    child.stdin.write(input)
-    child.stdin.end()
   })
+  return result!.stdout.trim()
+}
+
+// Network operations can hang (credentials, dead remote); cap them so the
+// caller's pending state always settles.
+const NETWORK_TIMEOUT_MS = 120_000
+
+async function runStdin(cwd: string, args: string[], input: string) {
+  let result!: string
+  await withIndexLockRetry(async () => {
+    result = await new Promise<string>((resolve, reject) => {
+      const child = spawn("git", args, { cwd, windowsHide: true })
+      let out = ""
+      let err = ""
+      child.stdout.on("data", (chunk) => (out += chunk))
+      child.stderr.on("data", (chunk) => (err += chunk))
+      child.on("error", reject)
+      child.on("close", (code) => {
+        if (code === 0) resolve(out)
+        else reject(new Error(err.trim() || `git exited with code ${code}`))
+      })
+      child.stdin.write(input)
+      child.stdin.end()
+    })
+  })
+  return result
 }
 
 async function patch(cwd: string, args: string[]) {
@@ -103,7 +140,7 @@ export async function checkout(cwd: string, branch: string) {
 export async function switchBranch(cwd: string, branch: string) {
   await run(cwd, ["checkout", branch])
   try {
-    await run(cwd, ["pull", "--ff-only"])
+    await run(cwd, ["pull", "--ff-only"], NETWORK_TIMEOUT_MS)
   } catch {
     // no upstream, detached, or not fast-forwardable: keep local branch as-is
   }
@@ -114,12 +151,12 @@ export async function createBranch(cwd: string, name: string, startPoint?: strin
 }
 
 export async function fetchRemote(cwd: string) {
-  return run(cwd, ["fetch", "--prune"])
+  return run(cwd, ["fetch", "--prune"], NETWORK_TIMEOUT_MS)
 }
 
 export async function pull(cwd: string) {
   try {
-    const output = await run(cwd, ["pull"])
+    const output = await run(cwd, ["pull"], NETWORK_TIMEOUT_MS)
     return { conflicted: false, output }
   } catch (error) {
     const conflictedFiles = await conflicts(cwd).catch(() => [] as string[])
@@ -179,22 +216,57 @@ export async function undoCommitInfo(cwd: string) {
   return { root, pushed }
 }
 
-export async function push(cwd: string) {
-  const upstream = await run(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).catch(() => "")
-  if (upstream) return run(cwd, ["push"])
+// A branch created from another branch keeps that branch as its upstream, and
+// plain `git push` (push.default=simple) refuses when the names differ. In
+// that case publish the branch under its own name and repoint the upstream.
+async function pushArgs(cwd: string, extra: string[]) {
   const branch = await run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).catch(() => "")
+  const upstream = await run(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).catch(() => "")
+  if (upstream && branch && upstream !== branch) {
+    const separator = upstream.indexOf("/")
+    const remote = separator === -1 ? (await primaryRemote(cwd).catch(() => undefined)) : upstream.slice(0, separator)
+    if (remote && branch !== "HEAD") return [...extra, "-u", remote, branch]
+  }
+  if (upstream) return [...extra]
   const remote = await primaryRemote(cwd).catch(() => undefined)
   if (!branch || branch === "HEAD" || !remote) throw new Error("No upstream branch and no remote to push to")
-  return run(cwd, ["push", "-u", remote, branch])
+  return [...extra, "-u", remote, branch]
+}
+
+export async function push(cwd: string) {
+  return run(cwd, ["push", ...(await pushArgs(cwd, []))], NETWORK_TIMEOUT_MS)
 }
 
 export async function pushForce(cwd: string) {
-  return run(cwd, ["push", "--force-with-lease"])
+  return run(cwd, ["push", "--force-with-lease", ...(await pushArgs(cwd, []))], NETWORK_TIMEOUT_MS)
+}
+
+// Number of commits on the current branch waiting to be pushed: ahead of the
+// upstream when there is one, otherwise commits no remote branch contains.
+export async function unpushed(cwd: string) {
+  const remotes = await run(cwd, ["remote"]).catch(() => "")
+  if (!remotes.trim()) return 0
+  const upstream = await run(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).catch(() => "")
+  const args = upstream
+    ? ["rev-list", "--count", `${upstream}..HEAD`]
+    : ["rev-list", "--count", "HEAD", "--not", "--remotes"]
+  const count = await run(cwd, args).catch(() => "0")
+  return Number.parseInt(count || "0", 10) || 0
 }
 
 export async function discard(cwd: string) {
   await run(cwd, ["checkout", "--", "."])
   await run(cwd, ["clean", "-fd"])
+}
+
+export async function discardFile(cwd: string, file: string) {
+  const status = await run(cwd, ["status", "--porcelain", "--", file]).catch(() => "")
+  const untracked = status.split("\n").some((line) => line.startsWith("??"))
+  if (untracked) {
+    await run(cwd, ["clean", "-f", "--", file])
+    return
+  }
+  await run(cwd, ["checkout", "--", file])
 }
 
 export async function merge(cwd: string, branch: string) {
@@ -223,6 +295,32 @@ export async function mergePreview(cwd: string, source: string, target: string) 
 
 export async function currentBranch(cwd: string) {
   return run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).catch(() => "")
+}
+
+// Reads .git/HEAD directly instead of spawning git. Equivalent to
+// `rev-parse --abbrev-ref HEAD` ("HEAD" when detached, "" outside a repo)
+// and cheap enough to call on a poll timer.
+export async function headBranch(cwd: string) {
+  const readHead = async (gitDir: string) => {
+    const head = (await readFile(join(gitDir, "HEAD"), "utf8").catch(() => "")) as string
+    const value = head.trim()
+    if (!value) return ""
+    if (!value.startsWith("ref: ")) return "HEAD"
+    return value.slice("ref: refs/heads/".length)
+  }
+
+  const dotGit = join(cwd, ".git")
+  try {
+    const stat = await lstat(dotGit)
+    if (stat.isDirectory()) return readHead(dotGit)
+    // Worktrees and submodules: .git is a file pointing at the real gitdir.
+    const pointer = ((await readFile(dotGit, "utf8").catch(() => "")) as string).trim()
+    const target = pointer.startsWith("gitdir:") ? pointer.slice("gitdir:".length).trim() : ""
+    if (!target) return ""
+    return readHead(resolve(cwd, target))
+  } catch {
+    return ""
+  }
 }
 
 export async function hasTrackedChanges(cwd: string) {
@@ -356,7 +454,11 @@ function workspaceBase(root?: string, folder?: string) {
     return root ? join(root, safe) : join(homedir(), "opencode-workspaces", safe)
   }
   if (root) return root
-  return join(homedir(), "opencode-workspaces", workspace.replace(/[^a-zA-Z0-9._-]/g, "-") || "workspace")
+  return join(homedir(), "opencode-workspaces", "workspace")
+}
+
+export function workspacePath(root?: string, folder?: string) {
+  return workspaceBase(root, folder || undefined)
 }
 
 export async function createWorkspaceDir(root: string | undefined, folder: string, meta?: unknown) {

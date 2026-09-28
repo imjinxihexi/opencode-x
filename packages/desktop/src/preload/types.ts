@@ -71,6 +71,7 @@ export type ElectronAPI = {
   draftBlobGet: (id: string) => Promise<ArrayBuffer | null>
 
   getWindowID: () => Promise<string>
+  openWindow: (route?: string) => Promise<void>
   onMenuCommand: (cb: (id: string) => void) => () => void
   onDeepLink: (cb: (urls: string[]) => void) => () => void
 
@@ -103,11 +104,14 @@ export type ElectronAPI = {
   gitDeleteBranch: (cwd: string, name: string, force?: boolean) => Promise<void>
   gitCommit: (cwd: string, message: string) => Promise<string>
   gitPush: (cwd: string) => Promise<string>
+  gitUnpushed: (cwd: string) => Promise<number>
   gitPushForce: (cwd: string) => Promise<string>
   gitDiscard: (cwd: string) => Promise<void>
+  gitDiscardFile: (cwd: string, file: string) => Promise<void>
   gitMerge: (cwd: string, branch: string) => Promise<{ conflicted: boolean }>
   gitMergePreview: (cwd: string, source: string, target: string) => Promise<{ commits: number; conflicts: boolean }>
   gitCurrentBranch: (cwd: string) => Promise<string>
+  gitHeadBranch: (cwd: string) => Promise<string>
   gitHasChanges: (cwd: string) => Promise<boolean>
   gitConflicts: (cwd: string) => Promise<string[]>
   gitResolveConflict: (cwd: string, file: string, side: "ours" | "theirs") => Promise<void>
@@ -137,6 +141,7 @@ export type ElectronAPI = {
   gitClone: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) => Promise<string>
   gitCreateWorkspaceDir: (root?: string, folder?: string, meta?: unknown) => Promise<string>
   gitReadWorkspaceMeta: (path: string) => Promise<Record<string, unknown> | undefined>
+  gitWorkspacePath: (root?: string, folder?: string) => Promise<string>
   gitRemoteBranches: (cwd: string) => Promise<string[]>
   gitLsRemoteBranches: (url: string) => Promise<string[]>
   getWindowFocused: () => Promise<boolean>

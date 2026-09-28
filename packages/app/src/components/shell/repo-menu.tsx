@@ -137,7 +137,7 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
           </MenuV2.Item>
 
           <MenuV2.Item onSelect={() => void pullRemote()}>
-            <Icon name="outline-share" size="small" />
+            <Icon name="outline-download" size="small" />
             <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.pull")}</span>
           </MenuV2.Item>
 
@@ -151,7 +151,7 @@ export function RepoMenu(props: { directory: string; onRefresh: () => void }) {
           </MenuV2.Item>
 
           <MenuV2.Item onSelect={() => props.onRefresh()}>
-            <Icon name="reset" size="small" />
+            <Icon name="outline-refresh" size="small" />
             <span class="min-w-0 flex-1 truncate">{language.t("shell.git.menu.refresh")}</span>
           </MenuV2.Item>
 

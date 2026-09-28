@@ -1,6 +1,8 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal } from "solid-js"
+import { createStore, reconcile } from "solid-js/store"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DialogConfirm } from "@/components/shell/dialog-confirm"
 import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { Spinner } from "@/components/shell/spinner"
 import { gitActions, type GitFileStatus } from "@/components/shell/git-actions"
@@ -148,18 +150,24 @@ export function StagingChanges(props: {
   const isCollapsed = (path: string) => Boolean(collapsed()[path])
   const toggleDir = (path: string) => setCollapsed((prev) => ({ ...prev, [path]: !prev[path] }))
 
+  // Rendered from a reconciled store so the periodic refresh only re-renders
+  // rows whose status actually changed.
+  const [statusStore, setStatusStore] = createStore<{ items: GitFileStatus[] }>({ items: [] })
   const [status] = createResource(
     () => [props.directory, props.refresh, props.revision, rev()] as const,
-    async ([directory]) => ({
-      directory: directory ?? "",
-      items: directory ? await gitActions.status(directory).catch(() => [] as GitFileStatus[]) : [],
-    }),
+    async ([directory]) => {
+      const items = directory ? await gitActions.status(directory).catch(() => [] as GitFileStatus[]) : []
+      if (directory === props.directory) {
+        setStatusStore("items", reconcile(items, { key: (item) => item.file }))
+      }
+      return { directory: directory ?? "", items }
+    },
   )
 
   const items = createMemo(() => {
     const value = status()
     if (!value || value.directory !== (props.directory ?? "")) return [] as GitFileStatus[]
-    return value.items
+    return statusStore.items
   })
 
   const staged = createMemo(() => toItems(items(), "index"))
@@ -194,6 +202,19 @@ export function StagingChanges(props: {
     void act("file", () =>
       isStaged ? gitActions.unstageFile(directory, item.file) : gitActions.stageFile(directory, item.file),
     )
+  }
+
+  const discardFile = (item: StageItem) => {
+    const directory = props.directory
+    if (!directory) return
+    dialog.show(() => (
+      <DialogConfirm
+        title={language.t("shell.git.discardFile.title")}
+        description={language.t("shell.git.discardConfirm.description")}
+        confirmLabel={language.t("shell.git.discard")}
+        onConfirm={() => void act("discard", () => gitActions.discardFile(directory, item.file))}
+      />
+    ))
   }
 
   const openDiff = (item: StageItem, isStaged: boolean) => {
@@ -264,11 +285,13 @@ export function StagingChanges(props: {
           <FileTree
             items={unstaged()}
             actionLabel={language.t("shell.git.stage")}
+            discardLabel={language.t("shell.git.discard")}
             busy={busy()}
             selected={props.activeFile ? { file: props.activeFile, staged: false } : undefined}
             staged={false}
             onSelect={(item) => openDiff(item, false)}
             onAction={(item) => toggleFile(item, false)}
+            onDiscard={(item) => discardFile(item)}
             isCollapsed={isCollapsed}
             toggleDir={toggleDir}
             conflicts={props.conflicts}
@@ -288,11 +311,13 @@ export function StagingChanges(props: {
 function FileTree(props: {
   items: StageItem[]
   actionLabel: string
+  discardLabel?: string
   busy: boolean
   selected?: Selection
   staged: boolean
   onSelect: (item: StageItem) => void
   onAction: (item: StageItem) => void
+  onDiscard?: (item: StageItem) => void
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
   conflicts: string[]
@@ -306,11 +331,13 @@ function FileDir(props: {
   depth: number
   items: StageItem[]
   actionLabel: string
+  discardLabel?: string
   busy: boolean
   selected?: Selection
   staged: boolean
   onSelect: (item: StageItem) => void
   onAction: (item: StageItem) => void
+  onDiscard?: (item: StageItem) => void
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
   conflicts: string[]
@@ -325,11 +352,13 @@ function FileDir(props: {
             dir={dir}
             depth={props.depth}
             actionLabel={props.actionLabel}
+            discardLabel={props.discardLabel}
             busy={props.busy}
             selected={props.selected}
             staged={props.staged}
             onSelect={props.onSelect}
             onAction={props.onAction}
+            onDiscard={props.onDiscard}
             isCollapsed={props.isCollapsed}
             toggleDir={props.toggleDir}
             conflicts={props.conflicts}
@@ -354,7 +383,20 @@ function FileDir(props: {
             <span class="min-w-0 flex-1 truncate text-[12px] leading-5 text-v2-text-text-base">
               {item.file.split("/").pop()}
             </span>
-            <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{item.letter}</span>
+            <Show when={props.onDiscard}>
+              <button
+                type="button"
+                class="flex shrink-0 items-center text-v2-icon-icon-muted opacity-0 transition-opacity hover:text-v2-text-text-base focus-visible:opacity-100 group-hover:opacity-100"
+                disabled={props.busy}
+                title={props.discardLabel}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  props.onDiscard?.(item)
+                }}
+              >
+                <Icon name="outline-reset" size="small" />
+              </button>
+            </Show>
             <button
               type="button"
               class="shrink-0 rounded-sm px-1 py-0.5 text-[11px] text-v2-text-text-muted opacity-0 transition-opacity hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:opacity-100 group-hover:opacity-100"
@@ -366,6 +408,7 @@ function FileDir(props: {
             >
               {props.actionLabel}
             </button>
+            <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{item.letter}</span>
           </div>
         )}
       </For>
@@ -377,11 +420,13 @@ function DirNode(props: {
   dir: TreeDir
   depth: number
   actionLabel: string
+  discardLabel?: string
   busy: boolean
   selected?: Selection
   staged: boolean
   onSelect: (item: StageItem) => void
   onAction: (item: StageItem) => void
+  onDiscard?: (item: StageItem) => void
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
   conflicts: string[]
@@ -408,11 +453,13 @@ function DirNode(props: {
           depth={props.depth + 1}
           items={[]}
           actionLabel={props.actionLabel}
+          discardLabel={props.discardLabel}
           busy={props.busy}
           selected={props.selected}
           staged={props.staged}
           onSelect={props.onSelect}
           onAction={props.onAction}
+          onDiscard={props.onDiscard}
           isCollapsed={props.isCollapsed}
           toggleDir={props.toggleDir}
           conflicts={props.conflicts}

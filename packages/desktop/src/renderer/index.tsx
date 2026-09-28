@@ -104,10 +104,62 @@ function setLastActiveUrl(windowID: string, value: string) {
 
 function DesktopMemoryRouter(props: BaseRouterProps & { windowID: string }) {
   const history = createMemoryHistory()
-  const initialUrl = getLastActiveUrl(props.windowID)
+  const initialUrl = getInitialUrl(props.windowID)
   if (initialUrl !== "/") history.set({ value: initialUrl, replace: true, scroll: false })
   onCleanup(history.listen((value) => setLastActiveUrl(props.windowID, value)))
   return <MemoryRouter {...props} history={history} />
+}
+
+function windowLockedWorkspaceKey(windowID: string) {
+  return `opencode.desktop.window.${windowID}.locked-workspace`
+}
+
+function setLockedWorkspace(windowID: string, workspace: string | undefined) {
+  if (typeof localStorage !== "object") return
+  try {
+    if (workspace) localStorage.setItem(windowLockedWorkspaceKey(windowID), workspace)
+    else localStorage.removeItem(windowLockedWorkspaceKey(windowID))
+  } catch {}
+}
+
+function getLockedWorkspace(windowID: string) {
+  if (typeof localStorage !== "object") return undefined
+  try {
+    const value = localStorage.getItem(windowLockedWorkspaceKey(windowID))
+    if (value && !value.startsWith("/")) return value
+  } catch {}
+  return undefined
+}
+
+function withWorkspaceQuery(url: string, workspace: string) {
+  const value = `${url}${url.includes("?") ? "&" : "?"}workspace=${encodeURIComponent(workspace)}`
+  return value.startsWith("/") && !value.startsWith("//") ? value : "/"
+}
+
+function parseWorkspaceQuery(url: string) {
+  try {
+    const parsed = new URL(`http://local${url}`)
+    return parsed.searchParams.get("workspace") ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+function getInitialUrl(windowID: string) {
+  // A route handed to createMainWindow arrives as the document hash.
+  const hash = window.location.hash
+  if (hash.startsWith("#/") && !hash.startsWith("#//")) {
+    const value = hash.slice(1)
+    const workspace = parseWorkspaceQuery(value)
+    // Remember the locked workspace so reloads and restarts restore it even
+    // after navigation has replaced the query parameter.
+    setLockedWorkspace(windowID, workspace)
+    return value
+  }
+  const last = getLastActiveUrl(windowID)
+  if (parseWorkspaceQuery(last)) return last
+  const locked = getLockedWorkspace(windowID)
+  return locked ? withWorkspaceQuery(last, locked) : last
 }
 
 const createPlatform = (windowState: DesktopWindowState): Platform => {
@@ -224,6 +276,10 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     async revealPath(path: string) {
       return window.api.revealPath(path)
     },
+    // Older preloads (before rebuild) lack this; fall back to in-window behavior.
+    openWindow: window.api.openWindow
+      ? async (route?: string) => window.api.openWindow(route)
+      : undefined,
 
     storage,
     draftStore: createDraftStore({

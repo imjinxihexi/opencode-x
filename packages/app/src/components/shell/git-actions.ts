@@ -42,6 +42,7 @@ type GitBridge = {
   gitClone?: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) => Promise<string>
   gitCreateWorkspaceDir?: (root?: string, folder?: string, meta?: unknown) => Promise<string>
   gitReadWorkspaceMeta?: (path: string) => Promise<Record<string, unknown> | undefined>
+  gitWorkspacePath?: (root?: string, folder?: string) => Promise<string>
   gitRemoteBranches?: (cwd: string) => Promise<string[]>
   gitLsRemoteBranches?: (url: string) => Promise<string[]>
 }
@@ -66,13 +67,16 @@ export const gitActions = {
     bridge()?.gitDeleteBranch?.(cwd, name, force) ?? Promise.resolve(),
   commit: (cwd: string, message: string) => bridge()?.gitCommit?.(cwd, message) ?? Promise.resolve(""),
   push: (cwd: string) => bridge()?.gitPush?.(cwd) ?? Promise.resolve(""),
+  unpushed: (cwd: string) => bridge()?.gitUnpushed?.(cwd) ?? Promise.resolve(0),
   pushForce: (cwd: string) => bridge()?.gitPushForce?.(cwd) ?? Promise.resolve(""),
   discard: (cwd: string) => bridge()?.gitDiscard?.(cwd) ?? Promise.resolve(),
+  discardFile: (cwd: string, file: string) => bridge()?.gitDiscardFile?.(cwd, file) ?? Promise.resolve(),
   merge: (cwd: string, branch: string) =>
     bridge()?.gitMerge?.(cwd, branch) ?? Promise.resolve({ conflicted: false }),
   mergePreview: (cwd: string, source: string, target: string) =>
     bridge()?.gitMergePreview?.(cwd, source, target) ?? Promise.resolve({ commits: 0, conflicts: false }),
-  currentBranch: (cwd: string) => bridge()?.gitCurrentBranch?.(cwd) ?? Promise.resolve(""),
+  // Prefer the direct .git/HEAD read (no git process spawn); callers poll it.
+  currentBranch: (cwd: string) => bridge()?.gitHeadBranch?.(cwd) ?? bridge()?.gitCurrentBranch?.(cwd) ?? Promise.resolve(""),
   hasChanges: (cwd: string) => bridge()?.gitHasChanges?.(cwd) ?? Promise.resolve(false),
   conflicts: (cwd: string) => bridge()?.gitConflicts?.(cwd) ?? Promise.resolve([] as string[]),
   resolveConflict: (cwd: string, file: string, side: "ours" | "theirs") =>
@@ -116,6 +120,8 @@ export const gitActions = {
     Promise.resolve(""),
   readWorkspaceMeta: (path: string) =>
     bridge()?.gitReadWorkspaceMeta?.(path) ?? Promise.resolve(undefined),
+  workspacePath: (root?: string, folder?: string) =>
+    bridge()?.gitWorkspacePath?.(root, folder) ?? Promise.resolve(""),
   remoteBranches: (cwd: string) => bridge()?.gitRemoteBranches?.(cwd) ?? Promise.resolve([] as string[]),
   lsRemoteBranches: (url: string) => bridge()?.gitLsRemoteBranches?.(url) ?? Promise.resolve([] as string[]),
 }

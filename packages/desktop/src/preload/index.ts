@@ -80,6 +80,7 @@ const api: ElectronAPI = {
   draftBlobGet: (id) => ipcRenderer.invoke("draft-blob-get", id),
 
   getWindowID: () => ipcRenderer.invoke("get-window-id"),
+  openWindow: (route?: string) => ipcRenderer.invoke("open-window", route),
   onMenuCommand: (cb) => {
     const handler = (_: unknown, id: string) => cb(id)
     ipcRenderer.on("menu-command", handler)
@@ -111,11 +112,14 @@ const api: ElectronAPI = {
   gitDeleteBranch: (cwd, name, force) => ipcRenderer.invoke("git-delete-branch", cwd, name, force),
   gitCommit: (cwd, message) => ipcRenderer.invoke("git-commit", cwd, message),
   gitPush: (cwd) => ipcRenderer.invoke("git-push", cwd),
+  gitUnpushed: (cwd) => ipcRenderer.invoke("git-unpushed", cwd),
   gitPushForce: (cwd) => ipcRenderer.invoke("git-push-force", cwd),
   gitDiscard: (cwd) => ipcRenderer.invoke("git-discard", cwd),
+  gitDiscardFile: (cwd, file) => ipcRenderer.invoke("git-discard-file", cwd, file),
   gitMerge: (cwd, branch) => ipcRenderer.invoke("git-merge", cwd, branch),
   gitMergePreview: (cwd, source, target) => ipcRenderer.invoke("git-merge-preview", cwd, source, target),
   gitCurrentBranch: (cwd) => ipcRenderer.invoke("git-current-branch", cwd),
+  gitHeadBranch: (cwd) => ipcRenderer.invoke("git-head-branch", cwd),
   gitHasChanges: (cwd) => ipcRenderer.invoke("git-has-changes", cwd),
   gitConflicts: (cwd) => ipcRenderer.invoke("git-conflicts", cwd),
   gitResolveConflict: (cwd, file, side) => ipcRenderer.invoke("git-resolve-conflict", cwd, file, side),
@@ -142,6 +146,7 @@ const api: ElectronAPI = {
     ipcRenderer.invoke("git-clone", url, workspace, name, branch, root, folder),
   gitCreateWorkspaceDir: (root, folder, meta) => ipcRenderer.invoke("git-create-workspace-dir", root, folder, meta),
   gitReadWorkspaceMeta: (path) => ipcRenderer.invoke("git-read-workspace-meta", path),
+  gitWorkspacePath: (root, folder) => ipcRenderer.invoke("git-workspace-path", root, folder),
   gitRemoteBranches: (cwd) => ipcRenderer.invoke("git-remote-branches", cwd),
   gitLsRemoteBranches: (url) => ipcRenderer.invoke("git-ls-remote-branches", url),
   getWindowFocused: () => ipcRenderer.invoke("get-window-focused"),

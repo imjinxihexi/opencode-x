@@ -21,13 +21,14 @@ export function safeFolderName(value: string) {
 }
 
 export function createWorkspaceStore() {
-  const [store, setStore] = persisted(
+  const [store, setStore, , ready] = persisted(
     Persist.global("git-workspaces"),
     createStore<{ list: Workspace[] }>({ list: [] }),
   )
 
   return {
     list: () => store.list,
+    ready,
     get: (id: string) => store.list.find((workspace) => workspace.id === id),
     create(name: string, prompt?: string, root?: string, folder?: string) {
       const workspace: Workspace = {

@@ -7,6 +7,7 @@ import { Field } from "@opencode-ai/ui/v2/field-v2"
 import { TextInputV2 } from "@opencode-ai/ui/v2/text-input-v2"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogConfirm } from "@/components/shell/dialog-confirm"
+import { Spinner } from "@/components/shell/spinner"
 import type { Workspace } from "@/components/shell/workspaces"
 import { useLanguage } from "@/context/language"
 
@@ -104,7 +105,7 @@ function WorkspaceMenu(props: {
 export function WorkspacesGrid(props: {
   workspaces: Workspace[]
   activeId?: string
-  onEnter: (workspace: Workspace) => void
+  onEnter: (workspace: Workspace) => void | Promise<void>
   onNewProject: (workspace: Workspace) => void
   onCreate: () => void
   onRename: (id: string, name: string) => void
@@ -113,6 +114,17 @@ export function WorkspacesGrid(props: {
 }) {
   const language = useLanguage()
   const [query, setQuery] = createSignal("")
+  const [entering, setEntering] = createSignal<string>()
+
+  const enter = async (workspace: Workspace) => {
+    if (entering()) return
+    setEntering(workspace.id)
+    try {
+      await props.onEnter(workspace)
+    } finally {
+      setEntering(undefined)
+    }
+  }
 
   const filtered = createMemo(() => {
     const term = query().trim().toLowerCase()
@@ -211,9 +223,12 @@ export function WorkspacesGrid(props: {
                       type="button"
                       variant="contrast"
                       class="!bg-none !bg-[#6366F1] !text-[#ffffff] !shadow-none transition-opacity hover:!opacity-90"
-                      onClick={() => props.onEnter(workspace)}
+                      disabled={!!entering()}
+                      onClick={() => void enter(workspace)}
                     >
-                      <Icon name="play" size="small" />
+                      <Show when={entering() === workspace.id} fallback={<Icon name="play" size="small" />}>
+                        <Spinner class="!text-[#ffffff]" />
+                      </Show>
                       {language.t("shell.workspace.grid.enter")}
                     </ButtonV2>
                     <ButtonV2 type="button" variant="neutral" onClick={() => props.onNewProject(workspace)}>

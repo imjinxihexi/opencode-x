@@ -101,6 +101,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M2.5 7.5H3.5V8.5H2.5V7.5Z" stroke="currentColor"/><path d="M7.5 7.5H8.5V8.5H7.5V7.5Z" stroke="currentColor"/><path d="M12.5 7.5H13.5V8.5H12.5V7.5Z" stroke="currentColor"/>`,
   },
+  "outline-chat": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M13.5 10.5C13.5 11.0523 13.0523 11.5 12.5 11.5H5.5L2.5 14V3.5C2.5 2.94772 2.94772 2.5 3.5 2.5H12.5C13.0523 2.5 13.5 2.94772 13.5 3.5V10.5Z" stroke="currentColor" stroke-linejoin="round"/>`,
+  },
   expand: {
     viewBox: "0 0 16 16",
     body: `<path d="M8.25 6.17773V1.17773M11.25 4.17773L8.25 1.17773L5.25 4.17773" stroke="currentColor"/><path d="M8.25 9.17773V14.1777M11.25 11.1777L8.25 14.1777L5.25 11.1777" stroke="currentColor"/><path d="M4.25 7.67773H12.25" stroke="currentColor"/>`,
@@ -136,6 +140,14 @@ const icons = {
   "outline-share": {
     viewBox: "0 0 16 16",
     body: `<path d="M13.5554 10.4445V13.5556C13.5554 13.5556 12.7599 13.5556 11.7777 13.5556H4.22211C3.23989 13.5556 2.44434 13.5556 2.44434 13.5556V10.4445M4.88878 5.55557L7.99989 2.44446L11.111 5.55557M7.99989 2.44446L7.99989 9.11112" stroke="currentColor"/>`,
+  },
+  "outline-download": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M13.5554 10.4445V13.5556C13.5554 13.5556 12.7599 13.5556 11.7777 13.5556H4.22211C3.23989 13.5556 2.44434 13.5556 2.44434 13.5556V10.4445M4.88878 5.55557L7.99989 8.66668L11.111 5.55557M7.99989 2.44446L7.99989 8.66668" stroke="currentColor"/>`,
+  },
+  "outline-refresh": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M14 8A6 6 0 1 1 8 2C9.68 2 11.29 2.67 12.49 3.83L14 5.33" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 2V5.33H10.67" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>`,
   },
   robot: {
     viewBox: "0 0 16 16",

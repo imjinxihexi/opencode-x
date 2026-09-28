@@ -1,4 +1,5 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup, onMount } from "solid-js"
+import { createStore, reconcile } from "solid-js/store"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
@@ -34,6 +35,7 @@ export function GitPanel(props: {
   onSelectRepo: (directory: string) => void
   activeFile?: string
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
+  onOpenFile?: (target: { directory: string; file: string }) => void
   hideResize?: boolean
   conflicts: string[]
   activeModel?: { providerID: string; modelID: string }
@@ -74,21 +76,108 @@ export function GitPanel(props: {
     })
   })
 
+  // Expanded directories, tracked by path outside the row components: the
+  // auto-refresh rebuilds the rows, but expanded state must survive.
+  const [openDirs, setOpenDirs] = createStore<Record<string, boolean>>({})
+  // Rows render from a reconciled list so the periodic refresh only touches
+  // rows whose entries actually changed.
+  const [entryStore, setEntryStore] = createStore<Entry[]>([])
+
   const [entries] = createResource(
     () =>
       tab() === "files" && props.selectedRepo
         ? ([props.selectedRepo, props.refresh, revision()] as const)
         : undefined,
     async ([directory]) => {
-      if (!directory) return []
-      const result = await sdk().client.file.list({ directory, path: "." }).catch(() => undefined)
-      const all = (result?.data ?? []) as Entry[]
-      return all.toSorted((a, b) => {
-        if (a.type !== b.type) return a.type === "directory" ? -1 : 1
-        return a.name.localeCompare(b.name)
-      })
+      const next = await listEntries(directory, ".")
+      if (tab() === "files" && props.selectedRepo) {
+        setEntryStore(reconcile(next, { key: (item) => item.path }))
+      }
+      return next
     },
   )
+  const sortedEntries = (list: Entry[]) =>
+    list.toSorted((a, b) => {
+      if (a.type !== b.type) return a.type === "directory" ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+
+  const listEntries = async (directory: string | undefined, path: string) => {
+    if (!directory) return []
+    const result = await sdk().client.file.list({ directory, path }).catch(() => undefined)
+    return sortedEntries((result?.data ?? []) as Entry[])
+  }
+
+  const joinPath = (parent: string, name: string) => (parent === "." ? name : `${parent}/${name}`)
+
+  // Lazy tree node: a directory expands in place and loads its children on
+  // demand; the global refresh (revision) refetches every open level.
+  const EntryNode = (node: { entry: Entry; parent: string; depth: number }) => {
+    const path = () => joinPath(node.parent, node.entry.name)
+    const open = () => Boolean(openDirs[path()])
+    const toggle = () => {
+      if (node.entry.type !== "directory") return
+      setOpenDirs(path(), (value) => !value)
+    }
+    const [childStore, setChildStore] = createStore<Entry[]>([])
+    const [children] = createResource(
+      () =>
+        node.entry.type === "directory" && open() && props.selectedRepo
+          ? ([props.selectedRepo, path(), revision()] as const)
+          : undefined,
+      async ([directory, dirPath]) => {
+        const next = await listEntries(directory, dirPath)
+        if (props.selectedRepo && open()) {
+          setChildStore(reconcile(next, { key: (item) => item.path }))
+        }
+        return next
+      },
+    )
+    return (
+      <>
+        {/* One level = chevron + gap plus a small offset for clearer nesting. */}
+        <div
+          class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+          style={{ "padding-inline-start": `${node.depth * 32 + 6}px` }}
+          title={path()}
+          onClick={() =>
+            node.entry.type === "directory"
+              ? toggle()
+              : props.selectedRepo && props.onOpenFile?.({ directory: props.selectedRepo, file: path() })
+          }
+        >
+          <Show when={node.entry.type === "directory"}>
+            <Icon
+              name="outline-chevron-down"
+              size="small"
+              class={`shrink-0 text-v2-icon-icon-muted transition-transform ${open() ? "" : "-rotate-90"}`}
+            />
+          </Show>
+          <Icon
+            name={node.entry.type === "directory" ? "folder" : "filetree"}
+            size="small"
+            class="shrink-0 text-v2-icon-icon-muted"
+          />
+          <span class="min-w-0 flex-1 truncate text-[12px] leading-5">{node.entry.name}</span>
+        </div>
+        <Show when={node.entry.type === "directory" && open()}>
+          <Show
+            when={children.state !== "pending"}
+            fallback={
+              <div class="px-1 py-1 text-[11px] text-v2-text-text-muted" style={{ "padding-inline-start": `${(node.depth + 1) * 12 + 6}px` }}>
+                {language.t("common.loading")}
+              </div>
+            }
+          >
+            <For each={childStore}>
+              {(entry) => <EntryNode entry={entry} parent={path()} depth={node.depth + 1} />}
+            </For>
+          </Show>
+        </Show>
+      </>
+    )
+  }
+
   return (
     <aside
       class="relative h-full shrink-0 flex flex-col border-l-[0.5px] border-v2-border-border-base bg-v2-background-bg-deep"
@@ -125,7 +214,7 @@ export function GitPanel(props: {
           onClick={() => setRevision((value) => value + 1)}
           title={language.t("shell.git.refresh")}
         >
-          <Icon name="reset" size="small" />
+          <Icon name="outline-refresh" size="small" />
         </button>
       </div>
 
@@ -197,23 +286,11 @@ export function GitPanel(props: {
                   {language.t("shell.git.files")}
                 </div>
                 <Show
-                  when={!entries.loading}
+                  when={entries.state !== "pending"}
                   fallback={<div class="px-1 py-4 text-[12px] text-v2-text-text-muted">{language.t("common.loading")}</div>}
                 >
-                  <For each={entries()}>
-                    {(entry) => (
-                      <div
-                        class="flex min-w-0 items-center gap-2 rounded-sm px-1.5 py-1 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
-                        title={entry.path}
-                      >
-                        <Icon
-                          name={entry.type === "directory" ? "folder" : "filetree"}
-                          size="small"
-                          class="shrink-0 text-v2-icon-icon-muted"
-                        />
-                        <span class="min-w-0 flex-1 truncate text-[12px] leading-5">{entry.name}</span>
-                      </div>
-                    )}
+                  <For each={entryStore}>
+                    {(entry) => <EntryNode entry={entry} parent="." depth={0} />}
                   </For>
                 </Show>
               </section>
@@ -258,6 +335,7 @@ function CommitSection(props: {
   const [totalCount, setTotalCount] = createSignal(0)
   const [pending, setPending] = createSignal<string>()
   const [commits, setCommits] = createSignal<GitCommit[]>([])
+  const [unpushedCount, setUnpushedCount] = createSignal(0)
   const [generating, setGenerating] = createSignal(false)
   const [changesOpen, setChangesOpen] = createSignal(true)
   const [historyOpen, setHistoryOpen] = createSignal(true)
@@ -334,6 +412,7 @@ function CommitSection(props: {
     if (!directory) {
       setCommits([])
       setHasMore(false)
+      setUnpushedCount(0)
       return
     }
     try {
@@ -344,6 +423,7 @@ function CommitSection(props: {
       setCommits([])
       setHasMore(false)
     }
+    setUnpushedCount(await gitActions.unpushed(directory).catch(() => 0))
   }
 
   const loadMoreCommits = async () => {
@@ -403,41 +483,44 @@ function CommitSection(props: {
       .finally(() => setPending(undefined))
   }
 
-  const pushWithRecovery = async () => {
+  const pushWithRecovery = () => {
     const directory = props.directory
     if (!directory) return
     setPending("push")
-    try {
-      await gitActions.push(directory)
-      props.onRefresh()
-      dialog.show(() => (
-        <DialogGitResult title={language.t("shell.git.push")} status="done" successLabel={language.t("shell.git.pushSuccess")} />
-      ))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      if (/rejected|non-fast-forward|fetch first|failed to push/i.test(message)) {
-        setPending(undefined)
-        dialog.show(() => (
-          <DialogConfirm
-            title={language.t("shell.git.pushRejected.title")}
-            description={language.t("shell.git.pushRejected.description")}
-            confirmLabel={language.t("shell.git.pushRejected.confirm")}
-            onConfirm={() =>
-              runAction("push", language.t("shell.git.push"), language.t("shell.git.pushForceSuccess"), () =>
-                gitActions.pushForce(directory),
-              )
-            }
-          />
-        ))
-        return
-      }
-      dialog.show(() => (
-        <DialogGitResult title={language.t("shell.git.push")} status="error" message={message} />
-      ))
-    } finally {
-      setPending(undefined)
-    }
+    dialog.show(() => (
+      <DialogGitRun
+        title={language.t("shell.git.push")}
+        runningLabel={language.t("shell.git.pushing")}
+        successLabel={language.t("shell.git.pushSuccess")}
+        onSettled={() => setPending(undefined)}
+        steps={[{ label: language.t("shell.git.push"), run: () => runPush(directory) }]}
+        run={async () => {
+          props.onRefresh()
+        }}
+      />
+    ))
   }
+
+  // Push and recover from a rejected (non-fast-forward) push by layering a
+  // force-push confirmation on top of the progress dialog.
+  const runPush = (directory: string) =>
+    gitActions.push(directory).catch(async (error) => {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!/rejected|non-fast-forward|fetch first|failed to push/i.test(message)) throw error
+      return new Promise<string>((resolve, reject) => {
+        dialog.push(
+          () => (
+            <DialogConfirm
+              title={language.t("shell.git.pushRejected.title")}
+              description={language.t("shell.git.pushRejected.description")}
+              confirmLabel={language.t("shell.git.pushRejected.confirm")}
+              onConfirm={() => gitActions.pushForce(directory).then(resolve, reject)}
+            />
+          ),
+          () => reject(new Error(message)),
+        )
+      })
+    })
 
   const requestUndoCommit = async () => {
     const directory = props.directory
@@ -484,10 +567,15 @@ function CommitSection(props: {
         title={language.t("shell.git.commitAndPush")}
         successLabel={language.t("shell.git.commitSuccess")}
         onSettled={() => setPending(undefined)}
+        steps={[
+          {
+            label: language.t("shell.git.stageAll"),
+            run: () => (stagedCount() === 0 ? gitActions.stageAll(directory, []) : Promise.resolve("")),
+          },
+          { label: language.t("shell.git.commit"), run: () => gitActions.commit(directory, message) },
+          { label: language.t("shell.git.push"), run: () => gitActions.push(directory) },
+        ]}
         run={async () => {
-          if (stagedCount() === 0) await gitActions.stageAll(directory, [])
-          await gitActions.commit(directory, message)
-          await gitActions.push(directory)
           props.setMessage("")
           props.onRefresh()
         }}
@@ -614,6 +702,7 @@ function CommitSection(props: {
           label={language.t("shell.git.push")}
           loading={pending() === "push"}
           disabled={busy() || !props.directory}
+          badge={unpushedCount()}
           onClick={() => void pushWithRecovery()}
         />
         <GitButton
@@ -692,7 +781,7 @@ function CommitSection(props: {
                 >
                   <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{commit.hash}</span>
                   <span class="min-w-0 flex-1 truncate text-v2-text-text-base">{commit.subject}</span>
-                  <span class="shrink-0 text-[11px] text-v2-text-text-muted">
+                  <span class="min-w-0 truncate text-[11px] text-v2-text-text-muted">
                     {commit.author} · {commit.when}
                   </span>
                 </div>
