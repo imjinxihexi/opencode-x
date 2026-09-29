@@ -164,7 +164,7 @@ export function StagingChanges(props: {
     async ([directory]) => {
       const items = directory ? await gitActions.status(directory).catch(() => [] as GitFileStatus[]) : []
       if (directory === props.directory) {
-        setStatusStore("items", reconcile(items, { key: (item) => item.file }))
+        setStatusStore("items", reconcile(items, { key: "file" }))
       }
       return { directory: directory ?? "", items }
     },

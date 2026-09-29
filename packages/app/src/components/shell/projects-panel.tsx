@@ -80,6 +80,7 @@ export function ProjectsPanel(props: {
   onSelectProject: (directory: string) => void
   onSelectRepo: (directory: string) => void
   onOpen: (directory: string) => void
+  onRemoveProject: (directory: string) => void
   onSelectWorkspace: (id: string) => void
   onCreateWorkspace: () => void
   onAddRepo: (workspace: Workspace) => void

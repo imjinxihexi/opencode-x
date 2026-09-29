@@ -93,7 +93,7 @@ export function GitPanel(props: {
     async ([directory]) => {
       const next = await listEntries(directory, ".")
       if (tab() === "files" && props.selectedRepo) {
-        setEntryStore(reconcile(next, { key: (item) => item.path }))
+        setEntryStore(reconcile(next, { key: "path" }))
       }
       return next
     },
@@ -154,20 +154,20 @@ export function GitPanel(props: {
       async ([directory, dirPath]) => {
         const next = await listEntries(directory, dirPath)
         if (props.selectedRepo && open()) {
-          setChildStore(reconcile(next, { key: (item) => item.path }))
+          setChildStore(reconcile(next, { key: "path" }))
         }
         return next
       },
     )
     return (
       <>
-        {/* One level = chevron + gap plus a small offset for clearer nesting. */}
+        {/* Metrics match the session file tree: ~44px rows, tighter icon gap, 30px indent. */}
         <div
-          class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 py-0.5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+          class="group flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm px-1.5 py-1 text-[13px] leading-5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
           classList={{
             "bg-v2-overlay-simple-overlay-pressed": isSelected(),
           }}
-          style={{ "padding-inline-start": `${node.depth * 32 + 6}px` }}
+          style={{ "padding-inline-start": `${node.depth * 30 + 6}px` }}
           title={path()}
           onClick={() =>
             node.entry.type === "directory"
@@ -175,16 +175,9 @@ export function GitPanel(props: {
               : props.selectedRepo && props.onOpenFile?.({ directory: props.selectedRepo, file: path() })
           }
         >
-          <Show when={node.entry.type === "directory"}>
-            <Icon
-              name="outline-chevron-down"
-              size="small"
-              class={`shrink-0 text-v2-icon-icon-muted transition-transform ${open() ? "" : "-rotate-90"}`}
-            />
-          </Show>
           <Icon
             name={node.entry.type === "directory" ? (open() ? "folder-open" : "folder") : "outline-file"}
-            size="small"
+            size="normal"
             class="shrink-0"
             classList={{
               [toneTextColor(fileTone(path()))]: node.entry.type === "file" && !!fileTone(path()),
@@ -192,7 +185,7 @@ export function GitPanel(props: {
             }}
           />
           <span
-            class="min-w-0 flex-1 truncate text-[12px] leading-5"
+            class="min-w-0 flex-1 truncate leading-5"
             classList={{ [toneTextColor(fileTone(path()))]: node.entry.type === "file" && !!fileTone(path()) }}
           >
             {node.entry.name}
@@ -203,8 +196,8 @@ export function GitPanel(props: {
             when={children.state !== "pending"}
             fallback={
               <div
-                class="flex items-center justify-center gap-2 py-2 text-[11px] text-v2-text-text-muted"
-                style={{ "padding-inline-start": `${node.depth * 32 + 6}px` }}
+                class="flex items-center justify-center gap-3 py-3 text-[12px] text-v2-text-text-muted"
+                style={{ "padding-inline-start": `${node.depth * 30 + 6}px` }}
               >
                 <Spinner />
                 {language.t("common.loading")}
@@ -488,7 +481,7 @@ function CommitSection(props: {
     }
   }
 
-  const onHistoryScroll = (event: UIEvent) => {
+  const onHistoryScroll = (event: Event) => {
     const element = event.currentTarget as HTMLElement
     if (element.scrollTop + element.clientHeight >= element.scrollHeight - 24) void loadMoreCommits()
   }

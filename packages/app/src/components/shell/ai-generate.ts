@@ -1,4 +1,8 @@
+import type { AgentPartInput, FilePartInput, SubtaskPartInput, TextPartInput } from "@opencode-ai/sdk/v2/client"
+
 type ModelRef = { providerID: string; modelID: string }
+
+type SessionPartInput = AgentPartInput | FilePartInput | SubtaskPartInput | TextPartInput
 
 type SessionClient = {
   session: {
@@ -12,7 +16,7 @@ type SessionClient = {
       model?: ModelRef
       system?: string
       tools?: Record<string, boolean>
-      parts: Array<{ type: string; text: string }>
+      parts: SessionPartInput[]
     }) => Promise<unknown>
     messages: (parameters: { sessionID: string; directory?: string }) => Promise<unknown>
     delete: (parameters: { sessionID: string; directory?: string }) => Promise<unknown>

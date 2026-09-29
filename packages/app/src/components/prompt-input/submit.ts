@@ -431,7 +431,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
             tabs.promoteDraft(
               draftID,
               { server: tabs.draft(draftID).server, sessionId: session.id },
-              { title: session.title, directory: sessionDirectory },
+              { title: created.title, directory: sessionDirectory },
             )
           else navigate(`/${base64Encode(sessionDirectory)}/session/${session.id}`)
           submission.retarget(prompt.capture({ dir: base64Encode(sessionDirectory), id: session.id }))

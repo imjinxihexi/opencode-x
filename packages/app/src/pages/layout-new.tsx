@@ -160,7 +160,7 @@ export default function NewLayout(props: ParentProps) {
       for (const item of saved) tabs.addSessionTab(item)
       const activeId = untrack(() => savedTabs[id]?.active)
       const target = saved.find((item) => item.sessionId === activeId) ?? saved[saved.length - 1]
-      tabs.select(target)
+      tabs.select({ type: "session", ...target })
       return
     }
     openWorkspace(workspace)
@@ -506,7 +506,7 @@ export default function NewLayout(props: ParentProps) {
     dialog.show(() => (
       <DialogConfirm
         title={language.t("session.delete.title")}
-        description={language.t("session.delete.confirm", { name: sessionTitle(session.title) })}
+        description={language.t("session.delete.confirm", { name: sessionTitle(session.title) ?? "" })}
         confirmLabel={language.t("session.delete.button")}
         onConfirm={() => archiveSession(session)}
       />
