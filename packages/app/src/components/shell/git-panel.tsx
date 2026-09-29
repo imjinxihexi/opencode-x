@@ -1,5 +1,6 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup, onMount } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
+import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
@@ -167,7 +168,7 @@ export function GitPanel(props: {
           classList={{
             "bg-v2-overlay-simple-overlay-pressed": isSelected(),
           }}
-          style={{ "padding-inline-start": `${node.depth * 30 + 6}px` }}
+          style={{ "padding-inline-start": `${node.depth * 22 + 6}px` }}
           title={path()}
           onClick={() =>
             node.entry.type === "directory"
@@ -175,15 +176,28 @@ export function GitPanel(props: {
               : props.selectedRepo && props.onOpenFile?.({ directory: props.selectedRepo, file: path() })
           }
         >
-          <Icon
-            name={node.entry.type === "directory" ? (open() ? "folder-open" : "folder") : "outline-file"}
-            size="normal"
-            class="shrink-0"
-            classList={{
-              [toneTextColor(fileTone(path()))]: node.entry.type === "file" && !!fileTone(path()),
-              "text-v2-icon-icon-muted": node.entry.type === "directory" || !fileTone(path()),
-            }}
-          />
+          {/* Folder rows show only the chevron + name; file rows show the type badge
+              icon in mono gray, in full color when the file is open in the viewer. */}
+          <Show
+            when={node.entry.type === "directory"}
+            fallback={
+              <FileIcon
+                node={{ path: path(), type: "file" }}
+                mono={!isSelected()}
+                class="size-4 shrink-0"
+                classList={{
+                  [toneTextColor(fileTone(path()))]: !!fileTone(path()),
+                  "text-v2-icon-icon-muted": !fileTone(path()),
+                }}
+              />
+            }
+          >
+            <Icon
+              name="outline-chevron-down"
+              size="normal"
+              class={`shrink-0 text-v2-icon-icon-muted transition-transform ${open() ? "" : "-rotate-90"}`}
+            />
+          </Show>
           <span
             class="min-w-0 flex-1 truncate leading-5"
             classList={{ [toneTextColor(fileTone(path()))]: node.entry.type === "file" && !!fileTone(path()) }}
@@ -197,7 +211,7 @@ export function GitPanel(props: {
             fallback={
               <div
                 class="flex items-center justify-center gap-3 py-3 text-[12px] text-v2-text-text-muted"
-                style={{ "padding-inline-start": `${node.depth * 30 + 6}px` }}
+                style={{ "padding-inline-start": `${node.depth * 22 + 6}px` }}
               >
                 <Spinner />
                 {language.t("common.loading")}

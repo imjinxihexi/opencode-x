@@ -50,12 +50,14 @@ function buildTree(items: StageItem[]): TreeDir {
   return root
 }
 
+/* Git status colors: added/deleted follow the pierre trees palette (light scheme);
+   modified keeps the amber tone. */
 export function toneColor(tone: Tone) {
-  return tone === "add" ? "bg-[#3fb950]" : tone === "del" ? "bg-[#f85149]" : "bg-[#d29922]"
+  return tone === "add" ? "bg-[#16a994]" : tone === "del" ? "bg-[#ff2e3f]" : "bg-[#d29922]"
 }
 
 export function toneTextColor(tone: Tone) {
-  return tone === "add" ? "text-[#3fb950]" : tone === "del" ? "text-[#f85149]" : "text-[#d29922]"
+  return tone === "add" ? "text-[#16a994]" : tone === "del" ? "text-[#ff2e3f]" : "text-[#d29922]"
 }
 
 export function splitHunks(patch: string) {
@@ -374,7 +376,7 @@ function FileDir(props: {
       <For each={props.node.files}>
         {(item) => (
           <div
-            class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-[3px] pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
+            class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-0.5 pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
             classList={{ "bg-v2-overlay-simple-overlay-pressed": active(item.file) }}
             style={{ "padding-inline-start": `${props.depth * 12 + 6}px` }}
             title={item.file}
@@ -382,7 +384,13 @@ function FileDir(props: {
           >
             <Show
               when={props.conflicts.includes(item.file)}
-              fallback={<span class={`size-1.5 shrink-0 rounded-full ${toneColor(item.tone)}`} />}
+              fallback={
+                <Icon
+                  name={item.tone === "add" ? "plus" : item.tone === "del" ? "outline-minus" : "edit"}
+                  size="small"
+                  class={`shrink-0 [stroke-width:1.75] ${toneTextColor(item.tone)}`}
+                />
+              }
             >
               <Icon name="warning" size="small" class="shrink-0 text-[#d29922]" />
             </Show>
@@ -414,7 +422,12 @@ function FileDir(props: {
             >
               {props.actionLabel}
             </button>
-            <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{item.letter}</span>
+            <span
+              class="shrink-0 font-mono text-[11px] font-[600]"
+              classList={{ [toneTextColor(item.tone)]: true }}
+            >
+              {item.letter}
+            </span>
           </div>
         )}
       </For>
@@ -441,7 +454,7 @@ function DirNode(props: {
   return (
     <>
       <div
-        class="flex min-w-0 cursor-pointer items-center gap-1 rounded-sm py-[3px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover"
+        class="flex min-w-0 cursor-pointer items-center gap-1 rounded-sm py-0.5 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover"
         style={{ "padding-inline-start": `${props.depth * 12 + 6}px` }}
         onClick={() => props.toggleDir(props.dir.path)}
       >
