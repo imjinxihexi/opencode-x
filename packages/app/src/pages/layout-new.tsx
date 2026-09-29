@@ -259,10 +259,29 @@ export default function NewLayout(props: ParentProps) {
   })
 
   const [conflicts] = createResource(
-    () => [state.repo, gitRefresh()] as const,
+    () => [state.repo, gitRefresh(), branchTick()] as const,
     async ([directory]) => (directory ? gitActions.conflicts(directory).catch(() => [] as string[]) : []),
     { initialValue: [] as string[] },
   )
+
+  // File watcher events make the git panel react to out-of-band git activity:
+  // resolving a conflicted file or touching .git (add/commit/merge from the
+  // terminal, an editor, or a session) refreshes immediately. The 15s poll is
+  // only a fallback for missed events.
+  createEffect(() => {
+    if (!state.repo) return
+    const stop = sdk().event.listen((event) => {
+      const details = (event as { details?: { type?: string; properties?: unknown } }).details
+      if (details?.type !== "file.watcher.updated") return
+      const props = (details.properties ?? {}) as { file?: string; event?: string }
+      const file = props.file
+      if (!file) return
+      const list = untrack(() => conflicts() ?? [])
+      if (list.length === 0) return
+      if (file.startsWith(".git/") || list.includes(file)) bumpGit()
+    })
+    onCleanup(stop)
+  })
 
   const reposLoading = () => (activeWorkspace() ? false : scanned.loading)
 

@@ -108,7 +108,7 @@ export function DialogGitRun(props: {
                     </span>
                   </div>
                   <Show when={step.output}>
-                    <pre class="max-h-24 overflow-auto rounded-md bg-v2-background-bg-layer-02 p-2 font-mono text-[11px] leading-4 whitespace-pre-wrap text-v2-text-text-muted">
+                    <pre class="max-h-[30vh] overflow-auto rounded-md bg-v2-background-bg-layer-02 p-2 font-mono text-[11px] leading-4 whitespace-pre-wrap text-v2-text-text-muted">
                       {step.output}
                     </pre>
                   </Show>
