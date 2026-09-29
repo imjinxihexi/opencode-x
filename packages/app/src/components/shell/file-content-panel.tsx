@@ -49,7 +49,7 @@ export function FileContentPanel(props: {
       style={{ width: `${props.width}px` }}
     >
       <div class="flex h-10 shrink-0 items-center gap-2 border-b-[0.5px] border-v2-border-border-muted px-3">
-        <Icon name="filetree" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+        <Icon name="outline-file" size="small" class="shrink-0 text-v2-icon-icon-muted" />
         <span
           class="min-w-0 flex-1 truncate font-mono text-[12px] text-v2-text-text-base"
           title={props.target.file}

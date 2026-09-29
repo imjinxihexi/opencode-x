@@ -10,6 +10,7 @@ import { DialogGitResult } from "@/components/shell/dialog-git-result"
 import { DialogGitRun } from "@/components/shell/dialog-git-run"
 import { DialogMerge } from "@/components/shell/dialog-merge"
 import { GitButton } from "@/components/shell/git-button"
+import { toneOf, toneTextColor, type GitTone } from "@/components/shell/staging-changes"
 import { gitActions, type GitCommit, type GitFileStatus } from "@/components/shell/git-actions"
 import { aiGenerateText, resolveCurrentModel } from "@/components/shell/ai-generate"
 import type { Repo } from "@/components/shell/repos"
@@ -97,6 +98,26 @@ export function GitPanel(props: {
       return next
     },
   )
+
+  // Git status per file, so tree icons can carry the change tone.
+  const [gitStatus] = createResource(
+    () =>
+      tab() === "files" && props.selectedRepo
+        ? ([props.selectedRepo, props.refresh, revision()] as const)
+        : undefined,
+    async ([directory]) => {
+      if (!directory) return {} as Record<string, GitTone>
+      const list = await gitActions.status(directory).catch(() => [] as GitFileStatus[])
+      const map: Record<string, GitTone> = {}
+      for (const entry of list) {
+        const code = entry.untracked ? "?" : entry.worktree !== " " ? entry.worktree : entry.index
+        map[entry.file] = toneOf(code)
+      }
+      return map
+    },
+    { initialValue: {} },
+  )
+  const fileTone = (filePath: string) => gitStatus()[filePath]
   const sortedEntries = (list: Entry[]) =>
     list.toSorted((a, b) => {
       if (a.type !== b.type) return a.type === "directory" ? -1 : 1
@@ -116,6 +137,10 @@ export function GitPanel(props: {
   const EntryNode = (node: { entry: Entry; parent: string; depth: number }) => {
     const path = () => joinPath(node.parent, node.entry.name)
     const open = () => Boolean(openDirs[path()])
+    const isSelected = () =>
+      node.entry.type === "file" &&
+      props.contentTarget?.file === path() &&
+      props.contentTarget?.directory === props.selectedRepo
     const toggle = () => {
       if (node.entry.type !== "directory") return
       setOpenDirs(path(), (value) => !value)
@@ -138,12 +163,9 @@ export function GitPanel(props: {
       <>
         {/* One level = chevron + gap plus a small offset for clearer nesting. */}
         <div
-          class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 py-1 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
+          class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 py-0.5 text-v2-text-text-base hover:bg-v2-overlay-simple-overlay-hover"
           classList={{
-            "bg-v2-overlay-simple-overlay-pressed":
-              node.entry.type === "file" &&
-              props.contentTarget?.file === path() &&
-              props.contentTarget?.directory === props.selectedRepo,
+            "bg-v2-overlay-simple-overlay-pressed": isSelected(),
           }}
           style={{ "padding-inline-start": `${node.depth * 32 + 6}px` }}
           title={path()}
@@ -161,11 +183,20 @@ export function GitPanel(props: {
             />
           </Show>
           <Icon
-            name={node.entry.type === "directory" ? "folder" : "filetree"}
+            name={node.entry.type === "directory" ? (open() ? "folder-open" : "folder") : "outline-file"}
             size="small"
-            class="shrink-0 text-v2-icon-icon-muted"
+            class="shrink-0"
+            classList={{
+              [toneTextColor(fileTone(path()))]: node.entry.type === "file" && !!fileTone(path()),
+              "text-v2-icon-icon-muted": node.entry.type === "directory" || !fileTone(path()),
+            }}
           />
-          <span class="min-w-0 flex-1 truncate text-[12px] leading-5">{node.entry.name}</span>
+          <span
+            class="min-w-0 flex-1 truncate text-[12px] leading-5"
+            classList={{ [toneTextColor(fileTone(path()))]: node.entry.type === "file" && !!fileTone(path()) }}
+          >
+            {node.entry.name}
+          </span>
         </div>
         <Show when={node.entry.type === "directory" && open()}>
           <Show
@@ -292,7 +323,7 @@ export function GitPanel(props: {
                 />
               }
             >
-              <section class="flex flex-col gap-0.5">
+              <section class="flex flex-col">
                 <div class="px-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
                   {language.t("shell.git.files")}
                 </div>

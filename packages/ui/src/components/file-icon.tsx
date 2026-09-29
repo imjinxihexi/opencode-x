@@ -1,6 +1,5 @@
 import type { Component, JSX } from "solid-js"
-import { createMemo, createUniqueId, splitProps, Show } from "solid-js"
-import sprite from "./file-icons/sprite.svg"
+import { createMemo, createSignal, createUniqueId, onMount, splitProps, Show } from "solid-js"
 import type { IconName } from "./file-icons/types"
 
 export type FileIconProps = JSX.GSVGAttributes<SVGSVGElement> & {
@@ -9,10 +8,48 @@ export type FileIconProps = JSX.GSVGAttributes<SVGSVGElement> & {
   mono?: boolean
 }
 
+// Chromium does not resolve external <use href="file.svg#id"> references, so
+// the sprite is inlined into the document once (lazily, it is ~1MB) and icons
+// reference same-document symbols.
+const spriteID = "opencode-file-icon-sprite"
+const symbolID = (name: string) => `opencode-file-icon-${name}`
+
+let inserted = false
+let inserting: Promise<void> | undefined
+
+function ensureSprite(): Promise<void> {
+  if (inserted) return Promise.resolve()
+  inserting ??= (async () => {
+    if (typeof document === "undefined") return
+    const { default: raw } = await import("./file-icons/sprite.svg?raw")
+    if (!document.getElementById(spriteID)) {
+      const host = document.createElement("div")
+      host.style.display = "none"
+      host.innerHTML = raw.replace(/id="([^"]+)"/g, (_match, id: string) => `id="${symbolID(id)}"`)
+      const svg = host.firstElementChild
+      if (svg instanceof SVGElement) {
+        svg.id = spriteID
+        svg.setAttribute("aria-hidden", "true")
+        svg.style.position = "absolute"
+        svg.style.width = "0"
+        svg.style.height = "0"
+        svg.style.overflow = "hidden"
+        document.body.insertBefore(svg, document.body.firstChild)
+      }
+    }
+    inserted = true
+  })()
+  return inserting
+}
+
 export const FileIcon: Component<FileIconProps> = (props) => {
   const [local, rest] = splitProps(props, ["node", "class", "classList", "expanded", "mono"])
   const name = createMemo(() => chooseIconName(local.node.path, local.node.type, local.expanded || false))
   const id = `file-icon-mono-${createUniqueId()}`
+  const [ready, setReady] = createSignal(inserted)
+  onMount(() => {
+    void ensureSprite().then(() => setReady(true))
+  })
   return (
     <svg
       data-component="file-icon"
@@ -22,13 +59,15 @@ export const FileIcon: Component<FileIconProps> = (props) => {
         [local.class ?? ""]: !!local.class,
       }}
     >
-      <Show when={local.mono} fallback={<use href={`${sprite}#${name()}`} />}>
-        <defs>
-          <mask id={id} mask-type="alpha">
-            <use href={`${sprite}#${name()}`} />
-          </mask>
-        </defs>
-        <rect width="100%" height="100%" fill="currentColor" mask={`url(#${id})`} />
+      <Show when={ready()}>
+        <Show when={local.mono} fallback={<use href={`#${symbolID(name())}`} />}>
+          <defs>
+            <mask id={id} mask-type="alpha">
+              <use href={`#${symbolID(name())}`} />
+            </mask>
+          </defs>
+          <rect width="100%" height="100%" fill="currentColor" mask={`url(#${id})`} />
+        </Show>
       </Show>
     </svg>
   )
@@ -586,3 +625,4 @@ export function chooseIconName(path: string, type: "directory" | "file", expande
 
   return ICON_MAPS.defaults.file
 }
+

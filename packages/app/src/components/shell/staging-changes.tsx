@@ -13,7 +13,9 @@ type StageItem = { file: string; letter: string; tone: Tone }
 type Selection = { file: string; staged: boolean }
 type TreeDir = { name: string; path: string; dirs: Map<string, TreeDir>; files: StageItem[] }
 
-function toneOf(code: string): Tone {
+export type GitTone = Tone
+
+export function toneOf(code: string): Tone {
   if (code === "?" || code === "A") return "add"
   if (code === "D") return "del"
   return "mod"
@@ -48,8 +50,12 @@ function buildTree(items: StageItem[]): TreeDir {
   return root
 }
 
-function toneColor(tone: Tone) {
+export function toneColor(tone: Tone) {
   return tone === "add" ? "bg-[#3fb950]" : tone === "del" ? "bg-[#f85149]" : "bg-[#d29922]"
+}
+
+export function toneTextColor(tone: Tone) {
+  return tone === "add" ? "text-[#3fb950]" : tone === "del" ? "text-[#f85149]" : "text-[#d29922]"
 }
 
 export function splitHunks(patch: string) {
