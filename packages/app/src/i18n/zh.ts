@@ -833,6 +833,7 @@ export const dict = {
   "shell.workspace.create.locationPlaceholder": "默认：~/opencode-workspaces/<名称>",
   "shell.workspace.create.locationHint": "可选。该工作空间克隆仓库的存放文件夹，会记住上次选择。",
   "shell.workspace.create.pickFolder": "选择文件夹",
+  "shell.workspace.create.locationRequired": "请先选择存储位置。",
   "shell.workspace.create.clearLocation": "恢复默认",
   "shell.workspace.addRepo.title": "新建项目",
   "shell.workspace.addRepo.into": "创建到「{{workspace}}」工作空间",

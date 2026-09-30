@@ -1186,4 +1186,5 @@ export const dict: Record<string, string> = {
   "shell.git.commitDetail.committer": "Committer",
   "shell.git.commitDetail.failed": "Failed to load the commit.",
   "shell.git.commitDetail.moreFiles": "…and {{count}} more files",
+  "shell.workspace.create.locationRequired": "Please choose a storage location first.",
 }

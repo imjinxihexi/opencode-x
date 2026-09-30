@@ -27,12 +27,8 @@ export function DialogCreateWorkspace(props: {
     createStore<{ last?: string }>({}),
   )
   const [override, setOverride] = createSignal<string | undefined>(undefined)
-  const [locationOpen, setLocationOpen] = createSignal(false)
+  const [locationOpen, setLocationOpen] = createSignal(true)
   const root = () => override() ?? remembered.last ?? ""
-
-  createEffect(() => {
-    if (remembered.last) setLocationOpen(true)
-  })
 
   const isSafeName = (value: string) => /^[a-zA-Z0-9._-]+$/.test(value)
 
@@ -63,7 +59,14 @@ export function DialogCreateWorkspace(props: {
     return false
   }
 
-  const canCreate = () => Boolean(name().trim() && identifier().trim()) && !nameInvalid() && !identifierInvalid()
+  // Desktop offers the folder picker, so a location can always be chosen there;
+  // on other platforms keep falling back to the default directory.
+  const needsRoot = () => platform.platform === "desktop" && Boolean(platform.openDirectoryPickerDialog)
+  const canCreate = () =>
+    Boolean(name().trim() && identifier().trim()) &&
+    !nameInvalid() &&
+    !identifierInvalid() &&
+    (!needsRoot() || Boolean(root().trim()))
 
   const pickFolder = async () => {
     if (platform.platform !== "desktop" || !platform.openDirectoryPickerDialog) return
@@ -114,7 +117,7 @@ export function DialogCreateWorkspace(props: {
         <div class="text-[12px] leading-5 text-v2-text-text-muted">
           {language.t("shell.workspace.create.description")}
         </div>
-        <Show when={root().trim()}>
+        <Show when={needsRoot()}>
           <div class="flex flex-col gap-1.5 rounded-md bg-v2-background-bg-layer-02 px-3 py-2">
             <button
               type="button"
@@ -129,21 +132,41 @@ export function DialogCreateWorkspace(props: {
               <span class="text-[12px] font-[530] leading-5 text-v2-text-text-muted">
                 {language.t("shell.workspace.create.location")}
               </span>
+              <span class="text-[#f85149]">*</span>
             </button>
             <Show when={locationOpen()}>
-              <div class="flex min-w-0 items-center gap-2 ps-[22px]">
-                <Icon name="folder" size="small" class="shrink-0 text-v2-icon-icon-muted" />
-                <span class="min-w-0 flex-1 truncate text-[12px] leading-5 text-v2-text-text-muted" title={root()}>
-                  {root()}
-                </span>
-                <button
-                  type="button"
-                  class="shrink-0 rounded-sm px-1 py-0.5 text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:outline-none"
-                  onClick={clearRoot}
-                >
-                  {language.t("shell.workspace.create.clearLocation")}
-                </button>
-              </div>
+              <Show
+                when={root().trim()}
+                fallback={
+                  <div class="flex min-w-0 items-center gap-2 ps-[22px]">
+                    <button
+                      type="button"
+                      class="flex min-w-0 items-center gap-1.5 rounded-sm px-1.5 py-1 text-[12px] leading-5 text-v2-text-text-base transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+                      onClick={() => void pickFolder()}
+                    >
+                      <Icon name="folder" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+                      {language.t("shell.workspace.create.pickFolder")}
+                    </button>
+                    <span class="min-w-0 truncate text-[11px] leading-4 text-[#f85149]">
+                      {language.t("shell.workspace.create.locationRequired")}
+                    </span>
+                  </div>
+                }
+              >
+                <div class="flex min-w-0 items-center gap-2 ps-[22px]">
+                  <Icon name="folder" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+                  <span class="min-w-0 flex-1 truncate text-[12px] leading-5 text-v2-text-text-muted" title={root()}>
+                    {root()}
+                  </span>
+                  <button
+                    type="button"
+                    class="shrink-0 rounded-sm px-1 py-0.5 text-[11px] text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:outline-none"
+                    onClick={clearRoot}
+                  >
+                    {language.t("shell.workspace.create.clearLocation")}
+                  </button>
+                </div>
+              </Show>
             </Show>
           </div>
         </Show>

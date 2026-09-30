@@ -770,6 +770,7 @@ export const dict = {
   "shell.workspace.create.locationPlaceholder": "Default: ~/opencode-workspaces/<name>",
   "shell.workspace.create.locationHint": "Optional. Folder where this workspace's repos are cloned. The last choice is remembered.",
   "shell.workspace.create.pickFolder": "Choose folder",
+  "shell.workspace.create.locationRequired": "Please choose a storage location first.",
   "shell.workspace.create.clearLocation": "Reset",
   "shell.workspace.addRepo.title": "New project",
   "shell.workspace.addRepo.into": "Create into the \"{{workspace}}\" workspace",
