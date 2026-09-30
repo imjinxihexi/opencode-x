@@ -1158,4 +1158,12 @@ export const dict = {
   "workspace.reset.archived.many": "{{count}} сесије ће бити архивиране.",
   "workspace.reset.note": "Ово ће ресетовати радни простор тако да одговара подразумеваној грани.",
   "dialog.usageExceeded.dontShowAgain": "Не приказуј поново",
+  "shell.git.commitDetail.title": "Commit details",
+  "shell.git.commitDetail.hash": "Commit",
+  "shell.git.commitDetail.parent": "Parent",
+  "shell.git.commitDetail.author": "Author",
+  "shell.git.commitDetail.date": "Date",
+  "shell.git.commitDetail.committer": "Committer",
+  "shell.git.commitDetail.failed": "Failed to load the commit.",
+  "shell.git.commitDetail.moreFiles": "…and {{count}} more files",
 }

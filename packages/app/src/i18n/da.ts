@@ -1245,4 +1245,12 @@ export const dict = {
   "help.tabs.persistence": "Dine faner er stadig åbne, når du åbner appen igen.",
   "help.tabs.worktrees":
     "Det nye design understøtter endnu ikke Git Worktrees, men understøttelsen kommer snart. Hvis du foretrækker at fortsætte med det tidligere layout, kan du skifte mellem layoutene under Indstillinger. Bemærk, at det nye layout bliver permanent om nogle få uger.",
+  "shell.git.commitDetail.title": "Commit details",
+  "shell.git.commitDetail.hash": "Commit",
+  "shell.git.commitDetail.parent": "Parent",
+  "shell.git.commitDetail.author": "Author",
+  "shell.git.commitDetail.date": "Date",
+  "shell.git.commitDetail.committer": "Committer",
+  "shell.git.commitDetail.failed": "Failed to load the commit.",
+  "shell.git.commitDetail.moreFiles": "…and {{count}} more files",
 }

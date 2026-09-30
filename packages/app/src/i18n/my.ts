@@ -1173,4 +1173,12 @@ export const dict = {
   "workspace.reset.archived.many": "{{count}} ဆက်ရှင်များကို သိမ်းဆည်းထားပါမည်။",
   "workspace.reset.note": "၎င်းသည် မူရင်းဌာနခွဲနှင့် ကိုက်ညီစေရန် အလုပ်ခွင်ကို ပြန်လည်သတ်မှတ်ပါမည်။",
   "dialog.usageExceeded.dontShowAgain": "ထပ်မပြပါနှင့်",
+  "shell.git.commitDetail.title": "Commit details",
+  "shell.git.commitDetail.hash": "Commit",
+  "shell.git.commitDetail.parent": "Parent",
+  "shell.git.commitDetail.author": "Author",
+  "shell.git.commitDetail.date": "Date",
+  "shell.git.commitDetail.committer": "Committer",
+  "shell.git.commitDetail.failed": "Failed to load the commit.",
+  "shell.git.commitDetail.moreFiles": "…and {{count}} more files",
 }

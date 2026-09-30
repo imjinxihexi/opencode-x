@@ -1173,4 +1173,12 @@ export const dict = {
   "desktop.wsl.error.failedPort": "Impossibile ottenere la porta",
   "desktop.picker.error.notSelected": "Il file non è stato selezionato nella finestra di selezione",
   "desktop.picker.error.sizeLimit": "Gli allegati selezionati superano il limite di {{limit}} MB",
+  "shell.git.commitDetail.title": "Commit details",
+  "shell.git.commitDetail.hash": "Commit",
+  "shell.git.commitDetail.parent": "Parent",
+  "shell.git.commitDetail.author": "Author",
+  "shell.git.commitDetail.date": "Date",
+  "shell.git.commitDetail.committer": "Committer",
+  "shell.git.commitDetail.failed": "Failed to load the commit.",
+  "shell.git.commitDetail.moreFiles": "…and {{count}} more files",
 }

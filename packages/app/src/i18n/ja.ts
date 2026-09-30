@@ -1166,4 +1166,12 @@ export const dict = {
 
   "titlebar.update": "アップデート",
   "titlebar.updateVersion": "アップデート {{version}}",
+  "shell.git.commitDetail.title": "Commit details",
+  "shell.git.commitDetail.hash": "Commit",
+  "shell.git.commitDetail.parent": "Parent",
+  "shell.git.commitDetail.author": "Author",
+  "shell.git.commitDetail.date": "Date",
+  "shell.git.commitDetail.committer": "Committer",
+  "shell.git.commitDetail.failed": "Failed to load the commit.",
+  "shell.git.commitDetail.moreFiles": "…and {{count}} more files",
 }

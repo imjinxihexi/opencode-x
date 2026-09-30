@@ -1,5 +1,19 @@
 export type GitBranch = { name: string; current: boolean }
 export type GitCommit = { hash: string; author: string; when: string; subject: string }
+export type GitCommitFile = { file: string; status: string }
+export type GitCommitDetail = {
+  hash: string
+  shortHash: string
+  parents: string[]
+  author: string
+  authorEmail: string
+  date: string
+  committer: string
+  committerEmail: string
+  message: string
+  files: GitCommitFile[]
+  filesTotal: number
+}
 export type GitFileStatus = { file: string; index: string; worktree: string; untracked: boolean }
 
 type GitBridge = {
@@ -24,6 +38,7 @@ type GitBridge = {
   gitConflictSides?: (cwd: string, file: string) => Promise<{ base: string; ours: string; theirs: string }>
   gitWriteResolved?: (cwd: string, file: string, content: string) => Promise<void>
   gitLog?: (cwd: string, limit?: number, skip?: number) => Promise<GitCommit[]>
+  gitShowCommit?: (cwd: string, hash: string) => Promise<GitCommitDetail>
   gitFileDiff?: (cwd: string, file: string) => Promise<string>
   gitStatusRaw?: (cwd: string) => Promise<GitFileStatus[]>
   gitStageFile?: (cwd: string, file: string) => Promise<void>
@@ -91,6 +106,8 @@ export const gitActions = {
     bridge()?.gitWriteResolved?.(cwd, file, content) ?? Promise.resolve(),
   log: (cwd: string, limit?: number, skip?: number) =>
     bridge()?.gitLog?.(cwd, limit, skip) ?? Promise.resolve([] as GitCommit[]),
+  showCommit: (cwd: string, hash: string) =>
+    bridge()?.gitShowCommit?.(cwd, hash) ?? Promise.resolve(undefined as GitCommitDetail | undefined),
   fileDiff: (cwd: string, file: string) => bridge()?.gitFileDiff?.(cwd, file) ?? Promise.resolve(""),
   status: (cwd: string) => bridge()?.gitStatusRaw?.(cwd) ?? Promise.resolve([] as GitFileStatus[]),
   stageFile: (cwd: string, file: string) => bridge()?.gitStageFile?.(cwd, file) ?? Promise.resolve(),

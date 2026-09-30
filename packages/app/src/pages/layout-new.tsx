@@ -10,6 +10,7 @@ import { DialogConfirm } from "@/components/shell/dialog-confirm"
 import { DialogWorkspaceDetail } from "@/components/shell/dialog-workspace-detail"
 import { DialogCreateWorkspace } from "@/components/shell/dialog-create-workspace"
 import { DiffPanel, type DiffTarget } from "@/components/shell/diff-panel"
+import { CommitDetailPanel, type CommitTarget } from "@/components/shell/commit-detail-panel"
 import { FileContentPanel } from "@/components/shell/file-content-panel"
 import { GitPanel } from "@/components/shell/git-panel"
 import { gitActions } from "@/components/shell/git-actions"
@@ -68,7 +69,10 @@ export default function NewLayout(props: ParentProps) {
     workspace: focusedWorkspaceId,
     locked: focusedWorkspaceId,
   })
-  const [panels, setPanels] = persisted(Persist.global("shell-panels"), createStore({ left: 236, right: 300, diff: 420 }))
+  const [panels, setPanels] = persisted(
+    Persist.global("shell-panels"),
+    createStore({ left: 236, right: 300, diff: 420, commit: 420 }),
+  )
   // Per-workspace tab memory, shared by every window: locked windows persist
   // their session tabs here and restore them on re-entry.
   const [savedTabs, setSavedTabs] = persisted(
@@ -77,6 +81,7 @@ export default function NewLayout(props: ParentProps) {
   )
   const [diffTarget, setDiffTarget] = createSignal<DiffTarget>()
   const [contentTarget, setContentTarget] = createSignal<{ directory: string; file: string }>()
+  const [commitTarget, setCommitTarget] = createSignal<CommitTarget>()
   const [gitRefresh, setGitRefresh] = createSignal(0)
   const server = useServer()
   const global = useGlobal()
@@ -298,6 +303,12 @@ export default function NewLayout(props: ParentProps) {
   })
 
   createEffect(() => {
+    const target = commitTarget()
+    if (!target) return
+    if (!repos().some((repo) => repo.directory === target.directory)) setCommitTarget(undefined)
+  })
+
+  createEffect(() => {
     const list = repos()
     if (!list || list.length === 0) return
     if (state.repo && list.some((repo) => repo.directory === state.repo)) return
@@ -420,6 +431,7 @@ export default function NewLayout(props: ParentProps) {
   const openWorkspace = (workspace: Workspace) => {
     setDiffTarget(undefined)
     setContentTarget(undefined)
+    setCommitTarget(undefined)
     setState("workspace", workspace.id)
     setState("picked", undefined)
     setState("selected", undefined)
@@ -484,6 +496,7 @@ export default function NewLayout(props: ParentProps) {
   const openWorkspaceSession = (session: Session) => {
     setDiffTarget(undefined)
     setContentTarget(undefined)
+    setCommitTarget(undefined)
     layout.projects.open(session.directory)
     if (state.locked) setState("repo", session.directory)
     const tab = tabs.addSessionTab({ server: server.key, sessionId: session.id })
@@ -644,8 +657,10 @@ export default function NewLayout(props: ParentProps) {
             activeFile={diffTarget()?.file}
             onOpenDiff={(target) => setDiffTarget(target)}
             onOpenFile={(target) => setContentTarget(target)}
+            onOpenCommit={(target) => setCommitTarget(target)}
+            activeCommit={commitTarget()}
             contentTarget={contentTarget()}
-            hideResize={Boolean(diffTarget()) || Boolean(contentTarget())}
+            hideResize={Boolean(diffTarget()) || Boolean(contentTarget()) || Boolean(commitTarget())}
             conflicts={conflicts() ?? []}
             activeModel={activeModel()}
             activeSessionId={activeSessionId()}
@@ -680,6 +695,18 @@ export default function NewLayout(props: ParentProps) {
                 refresh={gitRefresh()}
                 onResize={(width) => setPanels("diff", width)}
                 onClose={() => setContentTarget(undefined)}
+              />
+            )}
+          </Show>
+          <Show when={commitTarget()}>
+            {(target) => (
+              <CommitDetailPanel
+                target={target()}
+                width={panels.commit ?? 420}
+                minWidth={320}
+                maxWidth={720}
+                onResize={(width) => setPanels("commit", width)}
+                onClose={() => setCommitTarget(undefined)}
               />
             )}
           </Show>

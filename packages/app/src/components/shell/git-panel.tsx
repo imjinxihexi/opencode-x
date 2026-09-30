@@ -38,6 +38,8 @@ export function GitPanel(props: {
   activeFile?: string
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
   onOpenFile?: (target: { directory: string; file: string }) => void
+  onOpenCommit?: (target: { directory: string; hash: string }) => void
+  activeCommit?: { directory: string; hash: string }
   contentTarget?: { directory: string; file: string }
   hideResize?: boolean
   conflicts: string[]
@@ -324,6 +326,8 @@ export function GitPanel(props: {
                   onRefresh={props.onRefresh}
                   activeFile={props.activeFile}
                   onOpenDiff={props.onOpenDiff}
+                  onOpenCommit={props.onOpenCommit}
+                  activeCommit={props.activeCommit}
                   activeModel={props.activeModel}
                   activeSessionId={props.activeSessionId}
                   sessions={props.sessions}
@@ -376,6 +380,8 @@ function CommitSection(props: {
   onRefresh: () => void
   activeFile?: string
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
+  onOpenCommit?: (target: { directory: string; hash: string }) => void
+  activeCommit?: { directory: string; hash: string }
   activeModel?: { providerID: string; modelID: string }
   activeSessionId?: string
   sessions?: { sessionID: string; directory?: string }[]
@@ -830,8 +836,13 @@ function CommitSection(props: {
             <For each={commits()}>
               {(commit) => (
                 <div
-                  class="flex min-w-0 shrink-0 items-center gap-2 rounded-sm px-1.5 py-[3px] text-[12px] leading-5 hover:bg-v2-overlay-simple-overlay-hover"
+                  class="flex min-w-0 shrink-0 cursor-pointer items-center gap-2 rounded-sm px-1.5 py-[3px] text-[12px] leading-5 hover:bg-v2-overlay-simple-overlay-hover"
+                  classList={{
+                    "bg-v2-overlay-simple-overlay-pressed":
+                      props.directory === props.activeCommit?.directory && commit.hash === props.activeCommit?.hash,
+                  }}
                   title={`${commit.hash} ${commit.subject}`}
+                  onClick={() => props.directory && props.onOpenCommit?.({ directory: props.directory, hash: commit.hash })}
                 >
                   <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{commit.hash}</span>
                   <span class="min-w-0 flex-1 truncate text-v2-text-text-base">{commit.subject}</span>

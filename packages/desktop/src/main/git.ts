@@ -8,6 +8,23 @@ const execFileAsync = promisify(execFile)
 
 export type GitBranch = { name: string; current: boolean }
 export type GitCommit = { hash: string; author: string; when: string; subject: string }
+export type GitCommitFile = { file: string; status: string }
+// A single commit can touch tens of thousands of files; returning them all
+// freezes the renderer on DOM rows. Cap the list and report the total.
+const COMMIT_FILE_LIMIT = 200
+export type GitCommitDetail = {
+  hash: string
+  shortHash: string
+  parents: string[]
+  author: string
+  authorEmail: string
+  date: string
+  committer: string
+  committerEmail: string
+  message: string
+  files: GitCommitFile[]
+  filesTotal: number
+}
 export type GitFileStatus = { file: string; index: string; worktree: string; untracked: boolean }
 
 const INDEX_LOCK_DELAY_MS = 300
@@ -365,6 +382,38 @@ export async function log(cwd: string, limit = 20, skip = 0): Promise<GitCommit[
       const [hash, author, when, subject] = line.split("\x1f")
       return { hash: hash ?? "", author: author ?? "", when: when ?? "", subject: subject ?? "" }
     })
+}
+
+export async function showCommit(cwd: string, hash: string): Promise<GitCommitDetail> {
+  const format = ["%H", "%h", "%P", "%an", "%ae", "%aI", "%cn", "%ce", "%cI", "%B"].join("%x1f")
+  const meta = await run(cwd, ["show", "-s", `--pretty=format:${format}`, hash], 30_000)
+  const parts = meta.split("\x1f")
+  const [fullHash, shortHash, parentsRaw, author, authorEmail, date, committer, committerEmail] = parts
+  // -m --first-parent keeps merges (and root commits) showing one diff against
+  // the first parent instead of git's empty combined diff.
+  const status = await run(cwd, ["show", "--name-status", "--format=", "--no-renames", "-m", "--first-parent", hash], 30_000)
+  const files = status
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [status, file] = line.split("\t")
+      return { file: file ?? "", status: status ?? "M" }
+    })
+    .filter((item) => item.file)
+  return {
+    hash: fullHash ?? "",
+    shortHash: shortHash ?? "",
+    parents: (parentsRaw ?? "").split(" ").filter(Boolean),
+    author: author ?? "",
+    authorEmail: authorEmail ?? "",
+    date: date ?? "",
+    committer: committer ?? "",
+    committerEmail: committerEmail ?? "",
+    message: parts.slice(9).join("\x1f").trim(),
+    files: files.slice(0, COMMIT_FILE_LIMIT),
+    filesTotal: files.length,
+  }
 }
 
 export async function fileDiff(cwd: string, file: string) {

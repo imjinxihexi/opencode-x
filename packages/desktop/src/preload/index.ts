@@ -127,6 +127,7 @@ const api: ElectronAPI = {
   gitConflictSides: (cwd, file) => ipcRenderer.invoke("git-conflict-sides", cwd, file),
   gitWriteResolved: (cwd, file, content) => ipcRenderer.invoke("git-write-resolved", cwd, file, content),
   gitLog: (cwd, limit, skip) => ipcRenderer.invoke("git-log", cwd, limit, skip),
+  gitShowCommit: (cwd, hash) => ipcRenderer.invoke("git-show-commit", cwd, hash),
   gitFileDiff: (cwd, file) => ipcRenderer.invoke("git-file-diff", cwd, file),
   gitStatusRaw: (cwd) => ipcRenderer.invoke("git-status-raw", cwd),
   gitStageFile: (cwd, file) => ipcRenderer.invoke("git-stage-file", cwd, file),

@@ -46,6 +46,7 @@ import {
   fileDiff as gitFileDiff,
   hasTrackedChanges as gitHasTrackedChanges,
   log as gitLog,
+  showCommit as gitShowCommit,
   merge as gitMerge,
   mergeAbort as gitMergeAbort,
   mergePreview as gitMergePreview,
@@ -150,6 +151,9 @@ export function registerIpcHandlers(deps: Deps) {
   )
   ipcMain.handle("git-log", (_event: IpcMainInvokeEvent, cwd: string, limit?: number, skip?: number) =>
     gitLog(cwd, limit, skip),
+  )
+  ipcMain.handle("git-show-commit", (_event: IpcMainInvokeEvent, cwd: string, hash: string) =>
+    gitShowCommit(cwd, hash),
   )
   ipcMain.handle("git-file-diff", (_event: IpcMainInvokeEvent, cwd: string, file: string) => gitFileDiff(cwd, file))
   ipcMain.handle("git-status-raw", (_event: IpcMainInvokeEvent, cwd: string) => gitStatusRaw(cwd))

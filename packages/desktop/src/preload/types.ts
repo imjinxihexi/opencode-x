@@ -123,6 +123,22 @@ export type ElectronAPI = {
     limit?: number,
     skip?: number,
   ) => Promise<{ hash: string; author: string; when: string; subject: string }[]>
+  gitShowCommit: (
+    cwd: string,
+    hash: string,
+  ) => Promise<{
+    hash: string
+    shortHash: string
+    parents: string[]
+    author: string
+    authorEmail: string
+    date: string
+    committer: string
+    committerEmail: string
+    message: string
+    files: { file: string; status: string }[]
+    filesTotal: number
+  }>
   gitFileDiff: (cwd: string, file: string) => Promise<string>
   gitStatusRaw: (cwd: string) => Promise<{ file: string; index: string; worktree: string; untracked: boolean }[]>
   gitStageFile: (cwd: string, file: string) => Promise<void>
