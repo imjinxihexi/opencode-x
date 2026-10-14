@@ -101,17 +101,6 @@ export function DialogCreateWorkspace(props: {
     <Dialog fit>
       <DialogHeader>
         <DialogTitle>{language.t("shell.workspace.create.title")}</DialogTitle>
-        <Show when={platform.platform === "desktop" && platform.openDirectoryPickerDialog}>
-          <button
-            type="button"
-            class="flex size-7 shrink-0 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:outline-none"
-            title={language.t("shell.workspace.create.pickFolder")}
-            aria-label={language.t("shell.workspace.create.pickFolder")}
-            onClick={() => void pickFolder()}
-          >
-            <Icon name="folder" />
-          </button>
-        </Show>
       </DialogHeader>
       <DialogBody class="flex w-full flex-col gap-4 px-4 pt-2 pb-1">
         <div class="text-[12px] leading-5 text-v2-text-text-muted">
@@ -134,7 +123,7 @@ export function DialogCreateWorkspace(props: {
               </span>
               <span class="text-[#f85149]">*</span>
             </button>
-            <Show when={locationOpen()}>
+            <Show when={root().trim() ? locationOpen() : true}>
               <Show
                 when={root().trim()}
                 fallback={

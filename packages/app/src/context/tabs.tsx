@@ -179,6 +179,9 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
     const actions = {
       addSessionTab: (tab: Omit<SessionTab, "type">) => {
         const next = { type: "session" as const, ...tab }
+        // A tab that is being closed must not be re-added: effects on the still
+        // mounted session route re-run while the close navigation is in flight.
+        if (closing.has(tabKey(next))) return next
         const existing = store.find((item) => tabKey(item) === tabKey(next))
         if (existing) return existing
         setStore(

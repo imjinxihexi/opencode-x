@@ -260,7 +260,9 @@ export function Titlebar(props: {
                 if (!s) return
                 const sessionId = s.parentID ?? s.id
                 const next = { server: route.server ?? server.key, sessionId }
-                tabsStoreActions.addSessionTab(next)
+                // addSessionTab reads the tabs store; without untrack this effect
+                // would track it and re-add a tab the moment it is closed.
+                untrack(() => tabsStoreActions.addSessionTab(next))
               }
             })
 

@@ -40,6 +40,8 @@ export function GitPanel(props: {
   onOpenFile?: (target: { directory: string; file: string }) => void
   onOpenCommit?: (target: { directory: string; hash: string }) => void
   activeCommit?: { directory: string; hash: string }
+  collapsed?: boolean
+  onCollapsedChange?: (collapsed: boolean) => void
   contentTarget?: { directory: string; file: string }
   hideResize?: boolean
   conflicts: string[]
@@ -53,6 +55,8 @@ export function GitPanel(props: {
   const [tab, setTab] = createSignal<GitTab>("commit")
   const [message, setMessage] = createSignal("")
   const [revision, setRevision] = createSignal(0)
+  const collapsed = () => props.collapsed ?? false
+  const toggleCollapsed = () => props.onCollapsedChange?.(!collapsed())
 
   createEffect(
     on(
@@ -231,45 +235,60 @@ export function GitPanel(props: {
 
   return (
     <aside
-      class="relative h-full shrink-0 flex flex-col border-l-[0.5px] border-v2-border-border-base bg-v2-background-bg-deep"
+      class="relative h-full shrink-0 flex flex-col border-l-[0.5px] border-v2-border-border-base bg-v2-background-bg-deep transition-[width] duration-150 overflow-hidden"
       style={{ width: `${props.width}px` }}
     >
       <div class="flex h-10 shrink-0 items-center gap-1 px-2">
         <button
           type="button"
-          class="flex h-7 items-center gap-1.5 rounded-sm px-2 text-[13px] font-[440] leading-5 tracking-[-0.04px] transition-colors focus-visible:outline-none"
-          classList={{
-            "text-v2-text-text-base bg-v2-overlay-simple-overlay-pressed": tab() === "files",
-            "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover": tab() !== "files",
-          }}
-          onClick={() => setTab("files")}
+          class="flex size-7 shrink-0 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+          title={collapsed() ? language.t("shell.git.expand") : language.t("shell.git.collapse")}
+          onClick={toggleCollapsed}
         >
-          <Icon name="filetree" size="small" />
-          {language.t("shell.git.tab.files")}
+          <Icon
+            name="outline-chevron-down"
+            size="small"
+            class={`shrink-0 transition-transform ${collapsed() ? "-rotate-90" : ""}`}
+          />
         </button>
-        <button
-          type="button"
-          class="flex h-7 items-center gap-1.5 rounded-sm px-2 text-[13px] font-[440] leading-5 tracking-[-0.04px] transition-colors focus-visible:outline-none"
-          classList={{
-            "text-v2-text-text-base bg-v2-overlay-simple-overlay-pressed": tab() === "commit",
-            "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover": tab() !== "commit",
-          }}
-          onClick={() => setTab("commit")}
-        >
-          <Icon name="outline-share" size="small" />
-          {language.t("shell.git.tab.commit")}
-        </button>
-        <button
-          type="button"
-          class="ml-auto flex size-7 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-          onClick={() => setRevision((value) => value + 1)}
-          title={language.t("shell.git.refresh")}
-        >
-          <Icon name="outline-refresh" size="small" />
-        </button>
+        <Show when={!collapsed()}>
+          <button
+            type="button"
+            class="flex h-7 items-center gap-1.5 rounded-sm px-2 text-[13px] font-[440] leading-5 tracking-[-0.04px] transition-colors focus-visible:outline-none"
+            classList={{
+              "text-v2-text-text-base bg-v2-overlay-simple-overlay-pressed": tab() === "files",
+              "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover": tab() !== "files",
+            }}
+            onClick={() => setTab("files")}
+          >
+            <Icon name="filetree" size="small" />
+            {language.t("shell.git.tab.files")}
+          </button>
+          <button
+            type="button"
+            class="flex h-7 items-center gap-1.5 rounded-sm px-2 text-[13px] font-[440] leading-5 tracking-[-0.04px] transition-colors focus-visible:outline-none"
+            classList={{
+              "text-v2-text-text-base bg-v2-overlay-simple-overlay-pressed": tab() === "commit",
+              "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover": tab() !== "commit",
+            }}
+            onClick={() => setTab("commit")}
+          >
+            <Icon name="outline-share" size="small" />
+            {language.t("shell.git.tab.commit")}
+          </button>
+          <button
+            type="button"
+            class="ml-auto flex size-7 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+            onClick={() => setRevision((value) => value + 1)}
+            title={language.t("shell.git.refresh")}
+          >
+            <Icon name="outline-refresh" size="small" />
+          </button>
+        </Show>
       </div>
 
-      <ScrollView class="flex-1 min-h-0">
+      <Show when={!collapsed()}>
+        <ScrollView class="flex-1 min-h-0">
         <div class="flex flex-col gap-3 px-3 pb-4">
           <section class="flex flex-col gap-1">
             <div class="px-1 pt-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted">
@@ -355,7 +374,8 @@ export function GitPanel(props: {
             </Show>
           </Show>
         </div>
-      </ScrollView>
+        </ScrollView>
+      </Show>
       <Show when={!props.hideResize}>
         <ResizeHandle
           direction="horizontal"

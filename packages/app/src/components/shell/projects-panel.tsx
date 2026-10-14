@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, type JSX } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, type JSX } from "solid-js"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { Icon } from "@opencode-ai/ui/v2/icon"
@@ -105,12 +105,15 @@ export function ProjectsPanel(props: {
       .sort((a, b) => b.time.updated - a.time.updated)
   })
 
+  const [sessionsLoading, setSessionsLoading] = createSignal(false)
   createEffect(() => {
     const workspace = focusedWorkspace()
     if (!workspace) return
-    for (const repo of workspace.repos) {
-      void sync().project.loadSessions(repo.directory, { limit: 30 }).catch(() => {})
-    }
+    setSessionsLoading(true)
+    const loads = workspace.repos.map((repo) =>
+      sync().project.loadSessions(repo.directory, { limit: 30 }).catch(() => {}),
+    )
+    void Promise.all(loads).finally(() => setSessionsLoading(false))
   })
 
   const projects = createMemo(() => layout.projects.list())
@@ -224,7 +227,7 @@ export function ProjectsPanel(props: {
             </div>
           </Show>
 
-          <Show when={props.locked && workspaceSessions().length > 0}>
+          <Show when={props.locked && (workspaceSessions().length > 0 || sessionsLoading())}>
             <div class="flex flex-col gap-2">
               <div class="flex items-center gap-2 px-1 pt-2">
                 <span class="text-[12px] font-[530] leading-5 text-v2-text-text-muted">
@@ -232,7 +235,16 @@ export function ProjectsPanel(props: {
                 </span>
                 <span class="text-[12px] leading-5 text-v2-text-text-muted">{workspaceSessions().length}</span>
               </div>
-              <For each={workspaceSessions()}>
+              <Show
+                when={workspaceSessions().length > 0}
+                fallback={
+                  <div class="flex items-center gap-2 px-2 py-1.5 text-v2-text-text-muted">
+                    <Spinner />
+                    <span class="text-[12px] leading-4">{language.t("common.loading")}</span>
+                  </div>
+                }
+              >
+                <For each={workspaceSessions()}>
                 {(session) => {
                   const active = () => props.activeSessionId === session.id
                   return (
@@ -286,10 +298,11 @@ export function ProjectsPanel(props: {
                           </MenuV2.Content>
                         </MenuV2.Portal>
                       </MenuV2>
-                    </div>
-                  )
-                }}
-              </For>
+                     </div>
+                   )
+                 }}
+               </For>
+                </Show>
             </div>
           </Show>
 

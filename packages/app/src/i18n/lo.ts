@@ -1154,4 +1154,7 @@ export const dict = {
   "shell.git.commitDetail.failed": "Failed to load the commit.",
   "shell.git.commitDetail.moreFiles": "…and {{count}} more files",
   "shell.workspace.create.locationRequired": "Please choose a storage location first.",
+  "shell.git.commitDetail.copyHash": "Copy commit hash",
+  "shell.git.collapse": "Collapse panel",
+  "shell.git.expand": "Expand panel",
 }

@@ -73,6 +73,11 @@ export default function NewLayout(props: ParentProps) {
     Persist.global("shell-panels"),
     createStore({ left: 236, right: 300, diff: 420, commit: 420 }),
   )
+  // Collapsing the git panel shrinks the whole column to a slim header strip.
+  const [gitCollapsed, setGitCollapsed] = persisted(
+    Persist.global("git-panel-collapsed"),
+    createStore({ value: false }),
+  )
   // Per-workspace tab memory, shared by every window: locked windows persist
   // their session tabs here and restore them on re-entry.
   const [savedTabs, setSavedTabs] = persisted(
@@ -646,9 +651,11 @@ export default function NewLayout(props: ParentProps) {
           <GitPanel
             repos={repos()}
             selectedRepo={state.repo}
-            width={panels.right}
+            width={gitCollapsed.value ? 40 : panels.right}
             minWidth={RIGHT_MIN}
             maxWidth={RIGHT_MAX}
+            collapsed={gitCollapsed.value}
+            onCollapsedChange={(value) => setGitCollapsed("value", value)}
             loading={reposLoading()}
             refresh={gitRefresh()}
             onResize={(width) => setPanels("right", width)}
@@ -660,7 +667,9 @@ export default function NewLayout(props: ParentProps) {
             onOpenCommit={(target) => setCommitTarget(target)}
             activeCommit={commitTarget()}
             contentTarget={contentTarget()}
-            hideResize={Boolean(diffTarget()) || Boolean(contentTarget()) || Boolean(commitTarget())}
+            hideResize={
+              Boolean(diffTarget()) || Boolean(contentTarget()) || Boolean(commitTarget()) || gitCollapsed.value
+            }
             conflicts={conflicts() ?? []}
             activeModel={activeModel()}
             activeSessionId={activeSessionId()}

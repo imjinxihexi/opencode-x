@@ -258,10 +258,14 @@ function ResolvedTargetSessionRoute() {
   createEffect(() => {
     const session = current()
     if (!session) return
-    tabs.addSessionTab({
-      server: serverKey(),
-      sessionId: session.root.id,
-    })
+    // addSessionTab reads the tabs store; without untrack this effect would
+    // track it and re-add a tab the moment it is closed.
+    untrack(() =>
+      tabs.addSessionTab({
+        server: serverKey(),
+        sessionId: session.root.id,
+      }),
+    )
   })
 
   return (
