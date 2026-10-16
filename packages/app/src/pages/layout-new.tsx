@@ -581,7 +581,7 @@ export default function NewLayout(props: ParentProps) {
             : undefined
         }
       />
-      <div class="flex-1 min-h-0 min-w-0 flex">
+      <div class="relative flex-1 min-h-0 min-w-0 flex">
         <Show when={!panelsHidden()}>
           <ProjectsPanel
             selected={state.selected}
@@ -629,24 +629,33 @@ export default function NewLayout(props: ParentProps) {
           />
         </Show>
         <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
-          <Show
-            when={!showWorkspaces()}
-            fallback={
+          <Suspense>{props.children}</Suspense>
+        </main>
+        <Show when={showWorkspaces()}>
+          <div
+            class="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-8"
+            onClick={() => setShowWorkspaces(false)}
+          >
+            <div
+              class="flex h-full max-h-[760px] w-full max-w-[1240px] flex-col overflow-hidden rounded-xl border-[0.5px] border-v2-border-border-base bg-v2-background-bg-deep shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
               <WorkspacesGrid
                 workspaces={workspaces.list()}
                 activeId={state.workspace}
-                onEnter={enterWorkspace}
+                onEnter={(workspace) => {
+                  void enterWorkspace(workspace)
+                  setShowWorkspaces(false)
+                }}
                 onNewProject={addRepo}
                 onCreate={createWorkspace}
                 onRename={renameWorkspace}
                 onDelete={removeWorkspace}
                 onShowDetail={showWorkspaceDetail}
               />
-            }
-          >
-            <Suspense>{props.children}</Suspense>
-          </Show>
-        </main>
+            </div>
+          </div>
+        </Show>
         <Show when={!showWorkspaces() && !panelsHidden()}>
           <GitPanel
             repos={repos()}
