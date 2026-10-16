@@ -1,5 +1,6 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup, onMount } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
@@ -19,6 +20,7 @@ import { Spinner } from "@/components/shell/spinner"
 import { StagingChanges } from "@/components/shell/staging-changes"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
+import { usePlatform } from "@/context/platform"
 import { useServerSDK } from "@/context/server-sdk"
 import { Persist, persisted } from "@/utils/persist"
 
@@ -54,10 +56,17 @@ export function GitPanel(props: {
 }) {
   const language = useLanguage()
   const sdk = useServerSDK()
+  const platform = usePlatform()
 
   const [tab, setTab] = createSignal<GitTab>("commit")
   const [message, setMessage] = createSignal("")
   const [revision, setRevision] = createSignal(0)
+  // Right-click menu on the file tree: entry + viewport position.
+  const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number; entry: Entry }>()
+  const revealEntry = async (entry: Entry) => {
+    const opened = (await platform.revealPath?.(entry.absolute)) ?? false
+    if (!opened) await platform.openPath?.(entry.absolute)
+  }
   const collapsed = () => props.collapsed ?? false
   const toggleCollapsed = () => props.onCollapsedChange?.(!collapsed())
 
@@ -184,6 +193,10 @@ export function GitPanel(props: {
               ? toggle()
               : props.selectedRepo && props.onOpenFile?.({ directory: props.selectedRepo, file: path() })
           }
+          onContextMenu={(event) => {
+            event.preventDefault()
+            setContextMenu({ x: event.clientX, y: event.clientY, entry: node.entry })
+          }}
         >
           {/* Folder rows show only the chevron + name; file rows show the type badge
               icon in mono gray, in full color when the file is open in the viewer. */}
@@ -379,6 +392,19 @@ export function GitPanel(props: {
         </div>
         </ScrollView>
       </Show>
+      <DropdownMenu open={!!contextMenu()} onOpenChange={(open) => !open && setContextMenu(undefined)}>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            class="fixed"
+            style={{ left: `${contextMenu()?.x ?? 0}px`, top: `${contextMenu()?.y ?? 0}px` }}
+          >
+            <DropdownMenu.Item onSelect={() => void revealEntry(contextMenu()!.entry)}>
+              <Icon name="folder" class="w-4 h-4 mr-2" />
+              {language.t("shell.git.tree.revealFolder")}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu>
       <Show when={!props.hideResize}>
         <ResizeHandle
           direction="horizontal"

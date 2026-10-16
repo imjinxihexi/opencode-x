@@ -1,5 +1,6 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
+import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/v2/icon"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogConfirm } from "@/components/shell/dialog-confirm"
@@ -155,6 +156,9 @@ export function StagingChanges(props: {
   const [pending, setPending] = createSignal<string>()
   const [rev, setRev] = createSignal(0)
   const [collapsed, setCollapsed] = createSignal<Record<string, boolean>>({})
+  // Right-click menu on a change row: item + viewport position.
+  const [contextMenu, setContextMenu] = createSignal<{ x: number; y: number; item: StageItem }>()
+  const copyPath = (item: StageItem) => void navigator.clipboard.writeText(item.file)
 
   const isCollapsed = (path: string) => Boolean(collapsed()[path])
   const toggleDir = (path: string) => setCollapsed((prev) => ({ ...prev, [path]: !prev[path] }))
@@ -268,6 +272,10 @@ export function StagingChanges(props: {
                 onSelect={(item) => openDiff(item, true)}
                 onAction={(item) => toggleFile(item, true)}
                 conflicts={props.conflicts}
+                onContextMenu={(item, event) => {
+                  event.preventDefault()
+                  setContextMenu({ x: event.clientX, y: event.clientY, item })
+                }}
               />
             }
           >
@@ -282,6 +290,10 @@ export function StagingChanges(props: {
             isCollapsed={isCollapsed}
             toggleDir={toggleDir}
             conflicts={props.conflicts}
+            onContextMenu={(item, event) => {
+              event.preventDefault()
+              setContextMenu({ x: event.clientX, y: event.clientY, item })
+            }}
           />
           </Show>
         </div>
@@ -321,6 +333,10 @@ export function StagingChanges(props: {
                 onAction={(item) => toggleFile(item, false)}
                 onDiscard={(item) => discardFile(item)}
                 conflicts={props.conflicts}
+                onContextMenu={(item, event) => {
+                  event.preventDefault()
+                  setContextMenu({ x: event.clientX, y: event.clientY, item })
+                }}
               />
             }
           >
@@ -337,6 +353,10 @@ export function StagingChanges(props: {
             isCollapsed={isCollapsed}
             toggleDir={toggleDir}
             conflicts={props.conflicts}
+            onContextMenu={(item, event) => {
+              event.preventDefault()
+              setContextMenu({ x: event.clientX, y: event.clientY, item })
+            }}
           />
           </Show>
         </div>
@@ -347,6 +367,20 @@ export function StagingChanges(props: {
           {language.t("shell.git.noChanges")}
         </div>
       </Show>
+
+      <DropdownMenu open={!!contextMenu()} onOpenChange={(open) => !open && setContextMenu(undefined)}>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            class="fixed"
+            style={{ left: `${contextMenu()?.x ?? 0}px`, top: `${contextMenu()?.y ?? 0}px` }}
+          >
+            <DropdownMenu.Item onSelect={() => copyPath(contextMenu()!.item)}>
+              <Icon name="outline-copy" class="w-4 h-4 mr-2" />
+              {language.t("shell.git.changes.copyPath")}
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu>
     </div>
   )
 }
@@ -364,6 +398,7 @@ function FileTree(props: {
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
   conflicts: string[]
+  onContextMenu?: (item: StageItem, event: MouseEvent) => void
 }) {
   const tree = createMemo(() => buildTree(props.items))
   return <FileDir {...props} node={tree()} depth={0} />
@@ -380,6 +415,7 @@ function FileList(props: {
   onAction: (item: StageItem) => void
   onDiscard?: (item: StageItem) => void
   conflicts: string[]
+  onContextMenu?: (item: StageItem, event: MouseEvent) => void
 }) {
   return (
     <For each={props.items}>
@@ -401,6 +437,7 @@ function FileRow(props: {
   onAction: (item: StageItem) => void
   onDiscard?: (item: StageItem) => void
   conflicts: string[]
+  onContextMenu?: (item: StageItem, event: MouseEvent) => void
 }) {
   const active = () => props.selected?.file === props.item.file && props.selected?.staged === props.staged
   return (
@@ -410,6 +447,7 @@ function FileRow(props: {
       style={{ "padding-inline-start": `${props.depth * 12 + 6}px` }}
       title={props.item.file}
       onClick={() => props.onSelect(props.item)}
+      onContextMenu={(event) => props.onContextMenu?.(props.item, event)}
     >
       <Show
         when={props.conflicts.includes(props.item.file)}
@@ -474,6 +512,7 @@ function FileDir(props: {
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
   conflicts: string[]
+  onContextMenu?: (item: StageItem, event: MouseEvent) => void
 }) {
   const dirs = createMemo(() => [...props.node.dirs.values()].toSorted((a, b) => a.name.localeCompare(b.name)))
   return (
@@ -494,6 +533,7 @@ function FileDir(props: {
             isCollapsed={props.isCollapsed}
             toggleDir={props.toggleDir}
             conflicts={props.conflicts}
+            onContextMenu={props.onContextMenu}
           />
         )}
       </For>
@@ -512,6 +552,7 @@ function FileDir(props: {
             onAction={props.onAction}
             onDiscard={props.onDiscard}
             conflicts={props.conflicts}
+            onContextMenu={props.onContextMenu}
           />
         )}
       </For>
@@ -533,6 +574,7 @@ function DirNode(props: {
   isCollapsed: (path: string) => boolean
   toggleDir: (path: string) => void
   conflicts: string[]
+  onContextMenu?: (item: StageItem, event: MouseEvent) => void
 }) {
   const open = () => !props.isCollapsed(props.dir.path)
   return (
@@ -566,6 +608,7 @@ function DirNode(props: {
           isCollapsed={props.isCollapsed}
           toggleDir={props.toggleDir}
           conflicts={props.conflicts}
+          onContextMenu={props.onContextMenu}
         />
       </Show>
     </>

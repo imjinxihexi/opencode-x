@@ -303,6 +303,13 @@ export function Titlebar(props: {
                 if (route.type === "home") {
                   const current = layout.projects.list()[0]
                   if (current) {
+                    // Carry over the last used model so the prompt is ready to send.
+                    for (const item of [...tabs.store].reverse()) {
+                      const model = tabs.stateValue<PromptSession>(item, "prompt")?.model.current()
+                      if (!model) continue
+                      await tabs.newDraft({ server: server.key, directory: current.worktree }, "", model)
+                      return
+                    }
                     await tabs.newDraft({ server: server.key, directory: current.worktree }, "")
                     return
                   }

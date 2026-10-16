@@ -1271,4 +1271,6 @@ export const dict = {
   "shell.git.expand": "Expand panel",
   "shell.git.changes.flat": "Switch to flat list",
   "shell.git.changes.tree": "Switch to tree",
+  "shell.git.tree.revealFolder": "Open containing folder",
+  "shell.git.changes.copyPath": "Copy file path",
 } satisfies Partial<Record<Keys, string>>
