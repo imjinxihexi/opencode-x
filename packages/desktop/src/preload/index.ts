@@ -145,6 +145,13 @@ const api: ElectronAPI = {
   gitStashDrop: (cwd, ref) => ipcRenderer.invoke("git-stash-drop", cwd, ref),
   gitClone: (url, workspace, name, branch, root, folder) =>
     ipcRenderer.invoke("git-clone", url, workspace, name, branch, root, folder),
+  onCloneProgress: (cb) => {
+    const handler = (_: unknown, update: { percent?: number; line: string }) => cb(update)
+    ipcRenderer.on("git-clone-progress", handler)
+    return () => {
+      ipcRenderer.removeListener("git-clone-progress", handler)
+    }
+  },
   gitCreateWorkspaceDir: (root, folder, meta) => ipcRenderer.invoke("git-create-workspace-dir", root, folder, meta),
   gitReadWorkspaceMeta: (path) => ipcRenderer.invoke("git-read-workspace-meta", path),
   gitWorkspacePath: (root, folder) => ipcRenderer.invoke("git-workspace-path", root, folder),

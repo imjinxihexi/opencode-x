@@ -146,6 +146,7 @@ export function StagingChanges(props: {
   onTotal?: (count: number) => void
   conflicts: string[]
   activeFile?: string
+  view?: "flat" | "tree"
   onOpenDiff?: (target: { directory: string; file: string; staged: boolean }) => void
 }) {
   const language = useLanguage()
@@ -255,6 +256,21 @@ export function StagingChanges(props: {
               {language.t("shell.git.unstageAll")}
             </button>
           </div>
+          <Show
+            when={props.view === "tree"}
+            fallback={
+              <FileList
+                items={staged()}
+                actionLabel={language.t("shell.git.unstage")}
+                busy={busy()}
+                selected={props.activeFile ? { file: props.activeFile, staged: true } : undefined}
+                staged={true}
+                onSelect={(item) => openDiff(item, true)}
+                onAction={(item) => toggleFile(item, true)}
+                conflicts={props.conflicts}
+              />
+            }
+          >
           <FileTree
             items={staged()}
             actionLabel={language.t("shell.git.unstage")}
@@ -267,6 +283,7 @@ export function StagingChanges(props: {
             toggleDir={toggleDir}
             conflicts={props.conflicts}
           />
+          </Show>
         </div>
       </Show>
 
@@ -290,6 +307,23 @@ export function StagingChanges(props: {
               {language.t("shell.git.stageAll")}
             </button>
           </div>
+          <Show
+            when={props.view === "tree"}
+            fallback={
+              <FileList
+                items={unstaged()}
+                actionLabel={language.t("shell.git.stage")}
+                discardLabel={language.t("shell.git.discard")}
+                busy={busy()}
+                selected={props.activeFile ? { file: props.activeFile, staged: false } : undefined}
+                staged={false}
+                onSelect={(item) => openDiff(item, false)}
+                onAction={(item) => toggleFile(item, false)}
+                onDiscard={(item) => discardFile(item)}
+                conflicts={props.conflicts}
+              />
+            }
+          >
           <FileTree
             items={unstaged()}
             actionLabel={language.t("shell.git.stage")}
@@ -304,6 +338,7 @@ export function StagingChanges(props: {
             toggleDir={toggleDir}
             conflicts={props.conflicts}
           />
+          </Show>
         </div>
       </Show>
 
@@ -334,6 +369,96 @@ function FileTree(props: {
   return <FileDir {...props} node={tree()} depth={0} />
 }
 
+function FileList(props: {
+  items: StageItem[]
+  actionLabel: string
+  discardLabel?: string
+  busy: boolean
+  selected?: Selection
+  staged: boolean
+  onSelect: (item: StageItem) => void
+  onAction: (item: StageItem) => void
+  onDiscard?: (item: StageItem) => void
+  conflicts: string[]
+}) {
+  return (
+    <For each={props.items}>
+      {(item) => <FileRow {...props} item={item} depth={0} label={item.file} />}
+    </For>
+  )
+}
+
+function FileRow(props: {
+  item: StageItem
+  depth: number
+  label: string
+  actionLabel: string
+  discardLabel?: string
+  busy: boolean
+  selected?: Selection
+  staged: boolean
+  onSelect: (item: StageItem) => void
+  onAction: (item: StageItem) => void
+  onDiscard?: (item: StageItem) => void
+  conflicts: string[]
+}) {
+  const active = () => props.selected?.file === props.item.file && props.selected?.staged === props.staged
+  return (
+    <div
+      class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-0.5 pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
+      classList={{ "bg-v2-overlay-simple-overlay-pressed": active() }}
+      style={{ "padding-inline-start": `${props.depth * 12 + 6}px` }}
+      title={props.item.file}
+      onClick={() => props.onSelect(props.item)}
+    >
+      <Show
+        when={props.conflicts.includes(props.item.file)}
+        fallback={
+          <Icon
+            name={props.item.tone === "add" ? "plus" : props.item.tone === "del" ? "outline-minus" : "edit"}
+            size="small"
+            class={`shrink-0 [stroke-width:1.75] ${toneTextColor(props.item.tone)}`}
+          />
+        }
+      >
+        <Icon name="warning" size="small" class="shrink-0 text-[#d29922]" />
+      </Show>
+      <span class="min-w-0 flex-1 truncate text-[12px] leading-5 text-v2-text-text-base">{props.label}</span>
+      <Show when={props.onDiscard}>
+        <button
+          type="button"
+          class="flex shrink-0 items-center text-v2-icon-icon-muted opacity-0 transition-opacity hover:text-v2-text-text-base focus-visible:opacity-100 group-hover:opacity-100"
+          disabled={props.busy}
+          title={props.discardLabel}
+          onClick={(event) => {
+            event.stopPropagation()
+            props.onDiscard?.(props.item)
+          }}
+        >
+          <Icon name="outline-reset" size="small" />
+        </button>
+      </Show>
+      <button
+        type="button"
+        class="shrink-0 rounded-sm px-1 py-0.5 text-[11px] text-v2-text-text-muted opacity-0 transition-opacity hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:opacity-100 group-hover:opacity-100"
+        disabled={props.busy}
+        onClick={(event) => {
+          event.stopPropagation()
+          props.onAction(props.item)
+        }}
+      >
+        {props.actionLabel}
+      </button>
+      <span
+        class="shrink-0 font-mono text-[11px] font-[600]"
+        classList={{ [toneTextColor(props.item.tone)]: true }}
+      >
+        {props.item.letter}
+      </span>
+    </div>
+  )
+}
+
 function FileDir(props: {
   node: TreeDir
   depth: number
@@ -351,7 +476,6 @@ function FileDir(props: {
   conflicts: string[]
 }) {
   const dirs = createMemo(() => [...props.node.dirs.values()].toSorted((a, b) => a.name.localeCompare(b.name)))
-  const active = (file: string) => props.selected?.file === file && props.selected?.staged === props.staged
   return (
     <>
       <For each={dirs()}>
@@ -375,60 +499,20 @@ function FileDir(props: {
       </For>
       <For each={props.node.files}>
         {(item) => (
-          <div
-            class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-0.5 pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
-            classList={{ "bg-v2-overlay-simple-overlay-pressed": active(item.file) }}
-            style={{ "padding-inline-start": `${props.depth * 12 + 6}px` }}
-            title={item.file}
-            onClick={() => props.onSelect(item)}
-          >
-            <Show
-              when={props.conflicts.includes(item.file)}
-              fallback={
-                <Icon
-                  name={item.tone === "add" ? "plus" : item.tone === "del" ? "outline-minus" : "edit"}
-                  size="small"
-                  class={`shrink-0 [stroke-width:1.75] ${toneTextColor(item.tone)}`}
-                />
-              }
-            >
-              <Icon name="warning" size="small" class="shrink-0 text-[#d29922]" />
-            </Show>
-            <span class="min-w-0 flex-1 truncate text-[12px] leading-5 text-v2-text-text-base">
-              {item.file.split("/").pop()}
-            </span>
-            <Show when={props.onDiscard}>
-              <button
-                type="button"
-                class="flex shrink-0 items-center text-v2-icon-icon-muted opacity-0 transition-opacity hover:text-v2-text-text-base focus-visible:opacity-100 group-hover:opacity-100"
-                disabled={props.busy}
-                title={props.discardLabel}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  props.onDiscard?.(item)
-                }}
-              >
-                <Icon name="outline-reset" size="small" />
-              </button>
-            </Show>
-            <button
-              type="button"
-              class="shrink-0 rounded-sm px-1 py-0.5 text-[11px] text-v2-text-text-muted opacity-0 transition-opacity hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:opacity-100 group-hover:opacity-100"
-              disabled={props.busy}
-              onClick={(event) => {
-                event.stopPropagation()
-                props.onAction(item)
-              }}
-            >
-              {props.actionLabel}
-            </button>
-            <span
-              class="shrink-0 font-mono text-[11px] font-[600]"
-              classList={{ [toneTextColor(item.tone)]: true }}
-            >
-              {item.letter}
-            </span>
-          </div>
+          <FileRow
+            item={item}
+            depth={props.depth}
+            label={item.file.split("/").pop() ?? item.file}
+            actionLabel={props.actionLabel}
+            discardLabel={props.discardLabel}
+            busy={props.busy}
+            selected={props.selected}
+            staged={props.staged}
+            onSelect={props.onSelect}
+            onAction={props.onAction}
+            onDiscard={props.onDiscard}
+            conflicts={props.conflicts}
+          />
         )}
       </For>
     </>

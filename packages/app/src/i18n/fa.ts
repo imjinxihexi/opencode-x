@@ -1164,4 +1164,6 @@ export const dict = {
   "shell.git.commitDetail.copyHash": "Copy commit hash",
   "shell.git.collapse": "Collapse panel",
   "shell.git.expand": "Expand panel",
+  "shell.git.changes.flat": "Switch to flat list",
+  "shell.git.changes.tree": "Switch to tree",
 }

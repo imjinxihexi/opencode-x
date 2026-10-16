@@ -867,6 +867,8 @@ export const dict = {
   "shell.git.files": "文件",
   "shell.git.workspace": "工作区",
   "shell.git.changes": "改动",
+  "shell.git.changes.flat": "切换为平铺",
+  "shell.git.changes.tree": "切换为树状",
   "shell.git.noChanges": "没有改动",
   "shell.git.staged": "已暂存",
   "shell.git.unstaged": "未暂存",

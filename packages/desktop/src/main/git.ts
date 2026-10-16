@@ -530,15 +530,47 @@ export async function readWorkspaceMeta(path: string) {
   }
 }
 
-export async function clone(url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) {
+export type GitCloneProgress = { percent?: number; line: string }
+
+export async function clone(
+  url: string,
+  workspace: string,
+  name: string,
+  branch?: string,
+  root?: string,
+  folder?: string,
+  onProgress?: (update: GitCloneProgress) => void,
+) {
   const parent = workspaceBase(root, folder)
   await mkdir(parent, { recursive: true })
   const safe = (value: string) => value.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/^-+|-+$/g, "") || "repo"
   const dest = join(parent, safe(name))
-  const args = ["clone"]
+  // --progress forces git to emit its progress lines even when stderr is piped.
+  const args = ["clone", "--progress"]
   if (branch) args.push("--branch", branch)
   args.push(url, dest)
-  await execFileAsync("git", args, { windowsHide: true, maxBuffer: 10 * 1024 * 1024 })
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("git", args, { windowsHide: true })
+    let err = ""
+    const handle = (chunk: Buffer) => {
+      const text = String(chunk)
+      err = (err + text).slice(-4000)
+      // Progress lines are \r-separated and end with "N% (a/b)".
+      for (const raw of text.split(/[\r\n]+/)) {
+        const line = raw.trim()
+        if (!line) continue
+        const match = /(\d+)% \(\d+\/\d+\)/.exec(line)
+        onProgress?.({ percent: match ? Number(match[1]) : undefined, line })
+      }
+    }
+    child.stdout.on("data", handle)
+    child.stderr.on("data", handle)
+    child.on("error", reject)
+    child.on("close", (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(err.trim() || `git exited with code ${code}`))
+    })
+  })
   return dest
 }
 

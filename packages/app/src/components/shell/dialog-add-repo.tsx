@@ -34,6 +34,7 @@ export function DialogAddRepo(props: {
   const [nameTouched, setNameTouched] = createSignal(false)
   const [branch, setBranch] = createSignal("")
   const [busy, setBusy] = createSignal(false)
+  const [progress, setProgress] = createSignal<{ percent?: number; line: string }>()
   const [branches, setBranches] = createSignal<string[]>([])
   const [loadingBranches, setLoadingBranches] = createSignal(false)
 
@@ -75,6 +76,7 @@ export function DialogAddRepo(props: {
     const repoName = (name().trim() || nameFromUrl(remote)).trim()
     if (!remote || !repoName) return
     setBusy(true)
+    const stopProgress = gitActions.onCloneProgress((update) => setProgress(update))
     try {
       const directory = await gitActions.clone(
         remote,
@@ -97,6 +99,8 @@ export function DialogAddRepo(props: {
         />
       ))
     } finally {
+      stopProgress()
+      setProgress(undefined)
       setBusy(false)
     }
   }
@@ -166,6 +170,23 @@ export function DialogAddRepo(props: {
           </Field>
         </div>
         <div class="text-[11px] leading-4 text-v2-text-text-muted">{language.t("shell.workspace.addRepo.nameHint")}</div>
+        <Show when={busy() && progress()}>
+          {(value) => (
+            <div class="flex flex-col gap-1.5">
+              <Show when={value().percent !== undefined}>
+                <div class="h-1 w-full overflow-hidden rounded-full bg-v2-background-bg-layer-02">
+                  <div
+                    class="h-1 rounded-full bg-[#6366F1] transition-[width] duration-150"
+                    style={{ width: `${value().percent}%` }}
+                  />
+                </div>
+              </Show>
+              <div class="min-w-0 truncate font-mono text-[11px] leading-4 text-v2-text-text-muted" title={value().line}>
+                {value().line}
+              </div>
+            </div>
+          )}
+        </Show>
       </DialogBody>
       <DialogFooter>
         <ButtonV2 type="button" variant="neutral" disabled={busy()} onClick={dialog.close}>

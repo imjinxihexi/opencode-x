@@ -298,6 +298,23 @@ export function Titlebar(props: {
                   return
                 }
 
+                // A new tab from the home page is a plain default tab: skip the
+                // locked-scope directory and the remembered home selection.
+                if (route.type === "home") {
+                  const current = layout.projects.list()[0]
+                  if (current) {
+                    await tabs.newDraft({ server: server.key, directory: current.worktree }, "")
+                    return
+                  }
+                  const fallback = global.servers.list().flatMap((conn) => {
+                    const project = global.ensureServerCtx(conn).projects.list()[0]
+                    return project ? [{ server: ServerConnection.key(conn), project }] : []
+                  })[0]
+                  if (!fallback) return
+                  await tabs.newDraft({ server: fallback.server, directory: fallback.project.worktree }, "")
+                  return
+                }
+
                 const fixedDirectory = props.newTabDirectory?.()
                 if (fixedDirectory) {
                   const model = activeTab
@@ -305,21 +322,6 @@ export function Titlebar(props: {
                     : undefined
                   await tabs.newDraft({ server: server.key, directory: fixedDirectory }, "", model)
                   return
-                }
-
-                if (route.type === "home") {
-                  const selection = layout.home.selection()
-                  const conn = global.servers.list().find((item) => ServerConnection.key(item) === selection.server)
-                  const project = conn
-                    ? global
-                        .ensureServerCtx(conn)
-                        .projects.list()
-                        .find((item) => item.worktree === selection.directory)
-                    : undefined
-                  if (conn && project) {
-                    await tabs.newDraft({ server: ServerConnection.key(conn), directory: project.worktree }, "")
-                    return
-                  }
                 }
 
                 const current = layout.projects.list()[0]

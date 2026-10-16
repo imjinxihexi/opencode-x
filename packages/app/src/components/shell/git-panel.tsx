@@ -20,6 +20,9 @@ import { StagingChanges } from "@/components/shell/staging-changes"
 import { useLanguage } from "@/context/language"
 import { useModels } from "@/context/models"
 import { useServerSDK } from "@/context/server-sdk"
+import { Persist, persisted } from "@/utils/persist"
+
+type ChangesView = "flat" | "tree"
 
 type GitTab = "files" | "commit"
 type Entry = { name: string; path: string; absolute: string; type: "file" | "directory"; ignored: boolean }
@@ -418,6 +421,10 @@ function CommitSection(props: {
   const [unpushedCount, setUnpushedCount] = createSignal(0)
   const [generating, setGenerating] = createSignal(false)
   const [changesOpen, setChangesOpen] = createSignal(true)
+  const [changesView, setChangesView] = persisted(
+    Persist.global("git-changes-view"),
+    createStore<{ value: ChangesView }>({ value: "flat" }),
+  )
   const [historyOpen, setHistoryOpen] = createSignal(true)
   const [loadingMore, setLoadingMore] = createSignal(false)
   const [hasMore, setHasMore] = createSignal(true)
@@ -475,11 +482,12 @@ function CommitSection(props: {
       })
       props.setMessage(message)
     } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
       dialog.show(() => (
         <DialogGitResult
           title={language.t("shell.ai.generateFailed")}
           status="error"
-          message={error instanceof Error ? error.message : String(error)}
+          statusLabel={reason}
         />
       ))
     } finally {
@@ -703,18 +711,34 @@ function CommitSection(props: {
         </div>
       </Show>
 
-      <button
-        type="button"
-        class="flex items-center gap-1 px-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted hover:text-v2-text-text-base focus-visible:outline-none"
-        onClick={() => setChangesOpen((value) => !value)}
-      >
-        <Icon
-          name="outline-chevron-down"
-          size="small"
-          class={`shrink-0 transition-transform ${changesOpen() ? "" : "-rotate-90"}`}
-        />
-        {language.t("shell.git.changes")}
-      </button>
+      <div class="flex items-center gap-1 px-1">
+        <button
+          type="button"
+          class="flex min-w-0 flex-1 items-center gap-1 text-[11px] font-[530] uppercase leading-4 tracking-[0.05px] text-v2-text-text-muted hover:text-v2-text-text-base focus-visible:outline-none"
+          onClick={() => setChangesOpen((value) => !value)}
+        >
+          <Icon
+            name="outline-chevron-down"
+            size="small"
+            class={`shrink-0 transition-transform ${changesOpen() ? "" : "-rotate-90"}`}
+          />
+          {language.t("shell.git.changes")}
+        </button>
+        <Show when={changesOpen()}>
+          <button
+            type="button"
+            class="flex size-6 shrink-0 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover hover:text-v2-text-text-base focus-visible:outline-none"
+            title={
+              changesView.value === "flat"
+                ? language.t("shell.git.changes.tree")
+                : language.t("shell.git.changes.flat")
+            }
+            onClick={() => setChangesView("value", (value) => (value === "flat" ? "tree" : "flat"))}
+          >
+            <Icon name={changesView.value === "flat" ? "filetree" : "menu"} size="small" />
+          </button>
+        </Show>
+      </div>
       <div classList={{ hidden: !changesOpen() }}>
         <StagingChanges
           directory={props.directory}
@@ -724,6 +748,7 @@ function CommitSection(props: {
           onTotal={setTotalCount}
           conflicts={props.conflicts}
           activeFile={props.activeFile}
+          view={changesView.value}
           onOpenDiff={props.onOpenDiff}
         />
       </div>

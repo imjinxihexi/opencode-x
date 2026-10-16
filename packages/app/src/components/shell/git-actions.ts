@@ -58,6 +58,7 @@ type GitBridge = {
   gitStashPop?: (cwd: string, ref: string) => Promise<void>
   gitStashDrop?: (cwd: string, ref: string) => Promise<void>
   gitClone?: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) => Promise<string>
+  onCloneProgress?: (cb: (update: { percent?: number; line: string }) => void) => () => void
   gitCreateWorkspaceDir?: (root?: string, folder?: string, meta?: unknown) => Promise<string>
   gitReadWorkspaceMeta?: (path: string) => Promise<Record<string, unknown> | undefined>
   gitWorkspacePath?: (root?: string, folder?: string) => Promise<string>
@@ -135,6 +136,8 @@ export const gitActions = {
   stashDrop: (cwd: string, ref: string) => bridge()?.gitStashDrop?.(cwd, ref) ?? Promise.resolve(),
   clone: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) =>
     bridge()?.gitClone?.(url, workspace, name, branch, root, folder) ?? Promise.resolve(""),
+  onCloneProgress: (cb: (update: { percent?: number; line: string }) => void) =>
+    bridge()?.onCloneProgress?.(cb) ?? (() => {}),
   createWorkspaceDir: (root?: string, folder?: string, meta?: unknown) =>
     bridge()?.gitCreateWorkspaceDir?.(root, folder, meta ? JSON.parse(JSON.stringify(meta)) : undefined) ??
     Promise.resolve(""),

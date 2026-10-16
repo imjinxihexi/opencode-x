@@ -806,6 +806,8 @@ export const dict = {
   "shell.git.files": "Files",
   "shell.git.workspace": "Workspace",
   "shell.git.changes": "Changes",
+  "shell.git.changes.flat": "Switch to flat list",
+  "shell.git.changes.tree": "Switch to tree",
   "shell.git.noChanges": "No changes",
   "shell.git.staged": "Staged",
   "shell.git.unstaged": "Unstaged",

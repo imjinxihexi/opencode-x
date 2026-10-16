@@ -10,6 +10,8 @@ export function DialogGitResult(props: {
   title: string
   status: "running" | "done" | "error"
   successLabel?: string
+  /** Overrides the default per-status line (running/done/failed). */
+  statusLabel?: string
   message?: string
 }) {
   const language = useLanguage()
@@ -20,11 +22,12 @@ export function DialogGitResult(props: {
   })
 
   const label = () =>
-    props.status === "running"
+    props.statusLabel ??
+    (props.status === "running"
       ? language.t("shell.git.running")
       : props.status === "done"
         ? (props.successLabel ?? language.t("shell.git.commitSuccess"))
-        : language.t("shell.git.actionFailed")
+        : language.t("shell.git.actionFailed"))
 
   return (
     <Dialog fit>

@@ -155,6 +155,7 @@ export type ElectronAPI = {
   gitStashPop: (cwd: string, ref: string) => Promise<void>
   gitStashDrop: (cwd: string, ref: string) => Promise<void>
   gitClone: (url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) => Promise<string>
+  onCloneProgress: (cb: (update: { percent?: number; line: string }) => void) => () => void
   gitCreateWorkspaceDir: (root?: string, folder?: string, meta?: unknown) => Promise<string>
   gitReadWorkspaceMeta: (path: string) => Promise<Record<string, unknown> | undefined>
   gitWorkspacePath: (root?: string, folder?: string) => Promise<string>

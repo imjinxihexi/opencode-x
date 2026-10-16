@@ -178,15 +178,12 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("git-stash-drop", (_event: IpcMainInvokeEvent, cwd: string, ref: string) => gitStashDrop(cwd, ref))
   ipcMain.handle(
     "git-clone",
-    (
-      _event: IpcMainInvokeEvent,
-      url: string,
-      workspace: string,
-      name: string,
-      branch?: string,
-      root?: string,
-      folder?: string,
-    ) => gitClone(url, workspace, name, branch, root, folder),
+    (event: IpcMainInvokeEvent, url: string, workspace: string, name: string, branch?: string, root?: string, folder?: string) => {
+      const sender = event.sender
+      return gitClone(url, workspace, name, branch, root, folder, (update) => {
+        if (!sender.isDestroyed()) sender.send("git-clone-progress", update)
+      })
+    },
   )
   ipcMain.handle(
     "git-create-workspace-dir",
