@@ -54,11 +54,42 @@ function buildTree(items: StageItem[]): TreeDir {
 /* Git status colors: added/deleted follow the pierre trees palette (light scheme);
    modified keeps the amber tone. */
 export function toneColor(tone: Tone) {
-  return tone === "add" ? "bg-[#16a994]" : tone === "del" ? "bg-[#ff2e3f]" : "bg-[#d29922]"
+  return tone === "add" ? "bg-[#16a994]" : tone === "del" ? "bg-[#ff2e3f]" : "bg-[#FFAB00]"
+}
+
+// Filled status badge (colored square + white glyph), matching the legacy web app.
+// The pencil is an inline path: the shared "edit" icon draws its own frame,
+// which looks muddy inside a filled square.
+function ToneBadge(props: { tone: Tone }) {
+  return (
+    <span class={`flex size-3.5 shrink-0 items-center justify-center rounded-[3px] text-[#ffffff] ${toneColor(props.tone)}`}>
+      <Show
+        when={props.tone !== "add"}
+        fallback={<Icon name="plus" size="small" class="[stroke-width:2.5]" />}
+      >
+        <Show
+          when={props.tone !== "del"}
+          fallback={<Icon name="outline-minus" size="small" class="[stroke-width:2.5]" />}
+        >
+          <svg
+            viewBox="0 0 16 16"
+            class="size-2"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M11.1 2.6a1.7 1.7 0 0 1 2.4 2.4L6 12.5l-3 .7.7-3 7.4-7.6Z" />
+          </svg>
+        </Show>
+      </Show>
+    </span>
+  )
 }
 
 export function toneTextColor(tone: Tone) {
-  return tone === "add" ? "text-[#16a994]" : tone === "del" ? "text-[#ff2e3f]" : "text-[#d29922]"
+  return tone === "add" ? "text-[#16a994]" : tone === "del" ? "text-[#ff2e3f]" : "text-[#FFAB00]"
 }
 
 export function splitHunks(patch: string) {
@@ -444,20 +475,14 @@ function FileRow(props: {
     <div
       class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-0.5 pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
       classList={{ "bg-v2-overlay-simple-overlay-pressed": active() }}
-      style={{ "padding-inline-start": `${props.depth * 12 + 6}px` }}
+      style={{ "padding-inline-start": `${props.depth * 12 + 10}px` }}
       title={props.item.file}
       onClick={() => props.onSelect(props.item)}
       onContextMenu={(event) => props.onContextMenu?.(props.item, event)}
     >
       <Show
         when={props.conflicts.includes(props.item.file)}
-        fallback={
-          <Icon
-            name={props.item.tone === "add" ? "plus" : props.item.tone === "del" ? "outline-minus" : "edit"}
-            size="small"
-            class={`shrink-0 [stroke-width:1.75] ${toneTextColor(props.item.tone)}`}
-          />
-        }
+        fallback={<ToneBadge tone={props.item.tone} />}
       >
         <Icon name="warning" size="small" class="shrink-0 text-[#d29922]" />
       </Show>
@@ -581,7 +606,7 @@ function DirNode(props: {
     <>
       <div
         class="flex min-w-0 cursor-pointer items-center gap-1 rounded-sm py-0.5 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover"
-        style={{ "padding-inline-start": `${props.depth * 12 + 6}px` }}
+        style={{ "padding-inline-start": `${props.depth * 12 + 10}px` }}
         onClick={() => props.toggleDir(props.dir.path)}
       >
         <Icon

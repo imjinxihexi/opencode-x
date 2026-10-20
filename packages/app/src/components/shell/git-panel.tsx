@@ -917,7 +917,7 @@ function CommitSection(props: {
                 >
                   <span class="shrink-0 font-mono text-[11px] text-v2-text-text-muted">{commit.hash}</span>
                   <span class="min-w-0 flex-1 truncate text-v2-text-text-base">{commit.subject}</span>
-                  <span class="min-w-0 truncate text-[11px] text-v2-text-text-muted">
+                  <span class="min-w-0 max-w-[33%] shrink-2 truncate text-[11px] text-v2-text-text-muted">
                     {commit.author} · {commit.when}
                   </span>
                 </div>
