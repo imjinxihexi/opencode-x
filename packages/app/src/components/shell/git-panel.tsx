@@ -255,19 +255,15 @@ export function GitPanel(props: {
       style={{ width: `${props.width}px` }}
     >
       <div class="flex h-10 shrink-0 items-center gap-1 px-2">
-        <button
-          type="button"
-          class="flex size-7 shrink-0 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-          title={collapsed() ? language.t("shell.git.expand") : language.t("shell.git.collapse")}
-          onClick={toggleCollapsed}
-        >
-          <Icon
-            name="outline-chevron-down"
-            size="small"
-            class={`shrink-0 transition-transform ${collapsed() ? "-rotate-90" : ""}`}
-          />
-        </button>
         <Show when={!collapsed()}>
+          <button
+            type="button"
+            class="flex size-7 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+            onClick={() => setRevision((value) => value + 1)}
+            title={language.t("shell.git.refresh")}
+          >
+            <Icon name="outline-refresh" size="small" />
+          </button>
           <button
             type="button"
             class="flex h-7 items-center gap-1.5 rounded-sm px-2 text-[13px] font-[440] leading-5 tracking-[-0.04px] transition-colors focus-visible:outline-none"
@@ -292,15 +288,19 @@ export function GitPanel(props: {
             <Icon name="outline-share" size="small" />
             {language.t("shell.git.tab.commit")}
           </button>
-          <button
-            type="button"
-            class="ml-auto flex size-7 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
-            onClick={() => setRevision((value) => value + 1)}
-            title={language.t("shell.git.refresh")}
-          >
-            <Icon name="outline-refresh" size="small" />
-          </button>
         </Show>
+        <button
+          type="button"
+          class="ml-auto flex size-7 shrink-0 items-center justify-center rounded-sm text-v2-icon-icon-muted transition-colors hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline-none"
+          title={collapsed() ? language.t("shell.git.expand") : language.t("shell.git.collapse")}
+          onClick={toggleCollapsed}
+        >
+          <Icon
+            name="outline-chevron-down"
+            size="small"
+            class={`shrink-0 transition-transform ${collapsed() ? "-rotate-90" : ""}`}
+          />
+        </button>
       </div>
 
       <Show when={!collapsed()}>

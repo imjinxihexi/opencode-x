@@ -126,7 +126,7 @@ export function DiffPanel(props: {
             </div>
           }
         >
-          <div class="min-h-0 flex-1 overflow-auto [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent">
+          <div class="min-h-0 flex-1 overflow-auto select-text [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-v2-border-border-muted [&::-webkit-scrollbar-track]:bg-transparent">
             <div class="w-max min-w-full py-2">
               <For each={parsed().hunks}>
                 {(hunk) => (
@@ -153,7 +153,9 @@ export function DiffPanel(props: {
                             <span class="w-10 shrink-0 select-none px-1 text-end text-v2-text-text-muted opacity-60">
                               {row.right ?? row.left ?? ""}
                             </span>
-                            <span class="min-w-0 flex-1 pe-3">{row.text}</span>
+                            <span class="min-w-0 flex-1 pe-3">
+                              <DiffText text={row.text} kind={row.kind} />
+                            </span>
                           </div>
                         )}
                       </For>
@@ -189,7 +191,7 @@ function DiffSplit(props: { hunk: string[] }) {
               {row.left?.left ?? ""}
             </span>
             <span class={`min-w-0 flex-1 truncate pe-2 font-mono text-[11px] leading-4 ${rowClass(row.left?.kind ?? "ctx")}`}>
-              {row.left?.text ?? ""}
+              <DiffText text={row.left?.text} kind={row.left?.kind ?? "ctx"} />
             </span>
           </div>
           <div class="flex w-1/2 min-w-0">
@@ -197,11 +199,24 @@ function DiffSplit(props: { hunk: string[] }) {
               {row.right?.right ?? ""}
             </span>
             <span class={`min-w-0 flex-1 truncate pe-2 font-mono text-[11px] leading-4 ${rowClass(row.right?.kind ?? "ctx")}`}>
-              {row.right?.text ?? ""}
+              <DiffText text={row.right?.text} kind={row.right?.kind ?? "ctx"} />
             </span>
           </div>
         </div>
       )}
     </For>
+  )
+}
+
+// Renders a diff line: the +/- marker is a separate select-none span so copying
+// a selection excludes it, just like the line-number gutter.
+function DiffText(props: { text?: string; kind?: UnifiedRow["kind"] }) {
+  return (
+    <Show when={props.text !== undefined}>
+      <Show when={props.kind !== "ctx"} fallback={props.text}>
+        <span class="select-none">{props.text!.slice(0, 1)}</span>
+        {props.text!.slice(1)}
+      </Show>
+    </Show>
   )
 }
