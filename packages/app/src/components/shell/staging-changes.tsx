@@ -473,7 +473,7 @@ function FileRow(props: {
   const active = () => props.selected?.file === props.item.file && props.selected?.staged === props.staged
   return (
     <div
-      class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-0.5 pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
+      class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-0 pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
       classList={{ "bg-v2-overlay-simple-overlay-pressed": active() }}
       style={{ "padding-inline-start": `${props.depth * 12 + 10}px` }}
       title={props.item.file}
@@ -605,7 +605,7 @@ function DirNode(props: {
   return (
     <>
       <div
-        class="flex min-w-0 cursor-pointer items-center gap-1 rounded-sm py-0.5 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover"
+        class="flex min-w-0 cursor-pointer items-center gap-1 rounded-sm py-0 text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover"
         style={{ "padding-inline-start": `${props.depth * 12 + 10}px` }}
         onClick={() => props.toggleDir(props.dir.path)}
       >
