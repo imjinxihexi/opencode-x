@@ -530,14 +530,18 @@ function CommitSection(props: {
       return
     }
     try {
-      const result = await gitActions.log(directory, HISTORY_PAGE, 0)
+      // One round of parallel git calls: forks on Windows cost ~100ms each.
+      const [result, count] = await Promise.all([
+        gitActions.log(directory, HISTORY_PAGE, 0),
+        gitActions.unpushed(directory).catch(() => 0),
+      ])
       setCommits(result)
       setHasMore(result.length >= HISTORY_PAGE)
+      setUnpushedCount(count)
     } catch {
       setCommits([])
       setHasMore(false)
     }
-    setUnpushedCount(await gitActions.unpushed(directory).catch(() => 0))
   }
 
   const loadMoreCommits = async () => {
@@ -560,7 +564,8 @@ function CommitSection(props: {
     if (element.scrollTop + element.clientHeight >= element.scrollHeight - 24) void loadMoreCommits()
   }
 
-  onMount(loadCommits)
+  // The effect below already loads once on mount; a separate onMount call
+  // would duplicate the git log/unpushed spawns on every repo switch.
   createEffect(
     on(
       () => props.directory,

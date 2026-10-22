@@ -394,9 +394,19 @@ export function StagingChanges(props: {
       </Show>
 
       <Show when={unstaged().length === 0 && staged().length === 0}>
-        <div class="px-1 py-6 text-center text-[12px] leading-5 text-v2-text-text-muted">
-          {language.t("shell.git.noChanges")}
-        </div>
+        <Show
+          when={!status.loading}
+          fallback={
+            <div class="flex items-center justify-center gap-2 py-6 text-[12px] text-v2-text-text-muted">
+              <Spinner />
+              {language.t("common.loading")}
+            </div>
+          }
+        >
+          <div class="px-1 py-6 text-center text-[12px] leading-5 text-v2-text-text-muted">
+            {language.t("shell.git.noChanges")}
+          </div>
+        </Show>
       </Show>
 
       <DropdownMenu open={!!contextMenu()} onOpenChange={(open) => !open && setContextMenu(undefined)}>

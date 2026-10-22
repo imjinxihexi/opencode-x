@@ -261,13 +261,13 @@ export async function pushForce(cwd: string) {
 // Number of commits on the current branch waiting to be pushed: ahead of the
 // upstream when there is one, otherwise commits no remote branch contains.
 export async function unpushed(cwd: string) {
+  // Fast path: one git spawn resolves the upstream count directly. The slow
+  // path (no upstream) needs the remote list, so keep it after this attempt.
+  const upstreamCount = await run(cwd, ["rev-list", "--count", "@{u}..HEAD"]).catch(() => null)
+  if (upstreamCount !== null) return Number.parseInt(upstreamCount || "0", 10) || 0
   const remotes = await run(cwd, ["remote"]).catch(() => "")
   if (!remotes.trim()) return 0
-  const upstream = await run(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).catch(() => "")
-  const args = upstream
-    ? ["rev-list", "--count", `${upstream}..HEAD`]
-    : ["rev-list", "--count", "HEAD", "--not", "--remotes"]
-  const count = await run(cwd, args).catch(() => "0")
+  const count = await run(cwd, ["rev-list", "--count", "HEAD", "--not", "--remotes"]).catch(() => "0")
   return Number.parseInt(count || "0", 10) || 0
 }
 
