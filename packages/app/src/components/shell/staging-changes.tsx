@@ -475,7 +475,9 @@ function FileRow(props: {
     <div
       class="group flex min-w-0 cursor-pointer items-center gap-2 rounded-sm py-0 pe-1.5 hover:bg-v2-overlay-simple-overlay-hover"
       classList={{ "bg-v2-overlay-simple-overlay-pressed": active() }}
-      style={{ "padding-inline-start": `${props.depth * 12 + 10}px` }}
+      // Nested files align with their parent folder's icon (folder rows start
+      // with a chevron before the icon).
+      style={{ "padding-inline-start": `${props.depth * 12 + 10 + (props.depth > 0 ? 7 : 0)}px` }}
       title={props.item.file}
       onClick={() => props.onSelect(props.item)}
       onContextMenu={(event) => props.onContextMenu?.(props.item, event)}
